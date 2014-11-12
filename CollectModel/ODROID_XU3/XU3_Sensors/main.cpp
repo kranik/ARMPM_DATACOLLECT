@@ -27,12 +27,12 @@ int main(int argc, char* argv[])
 	int numbigcores;
 
 	if (argc > 1) {
-		if ((numLITTLEcores = atoi(argv[1])) == 0) {
+		if (4 < (numLITTLEcores = atoi(argv[1])) < 0){
 			cerr << "Argument 1 must be enabled LITTLE cores" << endl;
 			exit(1);
 		}
 	
-		if ((numbigcores = atoi(argv[2])) == 0) {
+		if (4 <(numbigcores = atoi(argv[2])) < 0){
 			cerr << "Argument 2 must be enabled big cores" << endl;
 			exit(1);
 		}

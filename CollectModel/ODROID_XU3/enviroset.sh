@@ -11,11 +11,17 @@ if (( "$1" )); then
 	echo "Sanity check CPUs:"
 	grep 'proc' /proc/cpuinfo
 	grep 'CPU part' /proc/cpuinfo
-	echo "Hotplug all but CPU0"
-	for i in `seq 1 7`
+	echo "Hotplug all selected CPU0"
+	#LITTLE cores
+	for i in `seq 1 3`
 	do
 		echo 0 > "/sys/devices/system/cpu/cpu$i/online"
 	done
+	for i in `seq 5 7`
+	do
+		echo 0 > "/sys/devices/system/cpu/cpu$i/online"
+	done
+	#big cores
 	echo "Hotplug sanity check CPUs:"
 	grep 'proc' /proc/cpuinfo
 	grep 'CPU part' /proc/cpuinfo
@@ -29,7 +35,13 @@ else
 	grep 'proc' /proc/cpuinfo
 	grep 'CPU part' /proc/cpuinfo
 	echo "Enable all CPUs"
-        for i in `seq 1 7`
+	#LITTLE cores
+        for i in `seq 1 3`
+        do      
+		echo 1 > "/sys/devices/system/cpu/cpu$i/online"
+        done
+	#big cores
+        for i in `seq 5 7`
         do      
 		echo 1 > "/sys/devices/system/cpu/cpu$i/online"
         done
