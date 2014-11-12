@@ -25,12 +25,12 @@ do
             #Set flag name
             	if [[ $opt == b ]]; then
 			core_select="big"
-			max_f=1200000
-			min_f=500000
+			max_f=2000000
+			min_f=200000
 		else
 		        core_select="LITTLE"
-		        max_f=500000
-		        min_f=175000
+		        max_f=1400000
+		        min_f=200000
 		fi
 
             #Make sure command has not already been processed (flag is unset)

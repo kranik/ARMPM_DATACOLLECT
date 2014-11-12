@@ -1,14 +1,10 @@
-// coded by chan at 2014-09-04
-
-#define NUMCORES	8
+// Krastin Nikov 2014
 
 #include "getnode.h"
 #include <iostream> // cout, endl
 #include <cstdlib>	// atoi
 #include <csignal>
 #include <unistd.h>	// sleep
-#include <ctime>
-#include <iomanip>	// cout format
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -27,14 +23,28 @@ void ctrl_c_handler(int s) {
 
 int main(int argc, char* argv[])
 {
+	int numLITTLEcores;
+	int numbigcores;
+
+	if (argc > 1) {
+		if ((numLITTLEcores = atoi(argv[1])) == 0) {
+			cerr << "Argument 1 must be enabled LITTLE cores" << endl;
+			exit(1);
+		}
+	
+		if ((numbigcores = atoi(argv[2])) == 0) {
+			cerr << "Argument 2 must be enabled big cores" << endl;
+			exit(1);
+		}
+		
+	}
+
 	struct sigaction sigIntHandler;
 	sigIntHandler.sa_handler = ctrl_c_handler;
 	sigemptyset(&sigIntHandler.sa_mask);
 	sigIntHandler.sa_flags = 0;
 	sigaction(SIGINT, &sigIntHandler, NULL);
-
 	int i;
-
 	time_t t;
     	
 	string a15Volt, a15Ampere, a15Watt;
@@ -44,7 +54,17 @@ int main(int argc, char* argv[])
 
 	getNode = new GetNode();
 
-	cout << "#Timestamp\tA7 Voltage(V)\tA7 Current(A)\tA7 Power(W)\tA15 Voltage(V)\tA15 Current(A)\tA15 Power(w)\tGPU Voltage(V)\tGPU Current(A)\tGPU Power(W)\tRAM Voltage(V)\tRAM Current(A)\tRAM Power(W)" << endl;
+	//Format the header line of the output
+	cout << "#Timestamp\t";
+	for (i = 0; i < numLITTLEcores; i++)
+		cout << "CPU(" << 0+i << ") Frequency(MHz)" << '\t' << "CPU(" << 0+i << ") Temperature(C)" << '\t';
+	cout << "A7 Voltage(V)\tA7 Current(A)\tA7 Power(W)\t";
+
+        for (i = 0; i < numbigcores; i++)
+                cout << "CPU(" << 4+i << ") Frequency(MHz)" << '\t' << "CPU(" << 4+i << ") Temperature(C)" << '\t';
+        cout << "A15 Voltage(V)\tA15 Current(A)\tA15 Power(W)\tGPU Frequency(MHz)\tGPU Temperature(C)\tGPU Voltage(V)\tGPU Current(A)\tGPU Power(W)\tRAM Voltage(V)\tRAM Current(A)\tRAM Power(W)" << endl;
+
+	//Use bash timestamp function to collect timings	
 	string cmd="echo $(date +'%s%N')'\t'";
   	struct timespec sleep;
   	sleep.tv_sec = 0;
@@ -56,41 +76,32 @@ int main(int argc, char* argv[])
 		cerr << "OpenINA231 error" << endl;
 		exit(1);
 	}
-	else {
-		cerr << "This loops forever until press <Ctrl-C>!" << endl;
-	}
-        //Wait 0.5 sec to initalise sensors
+        
+	//Wait 0.5 sec to initalise sensors
 	nanosleep(&sleep,NULL);
-
+	
 	while(1) {
+
+		//Get sensor information
+                getNode->GetINA231();
+         	
+		//This makes sure that the time value pronted usign date is as close to the measurement to watt as possible, having a preallocated command string to just append the measurement value os the fastest way to generate the command to pass to system
+		string output;
+		for (i = 0; i < numLITTLEcores; i++)
+                        output +=  getNode->GetCPUCurFreq(0+i) + '\t' + getNode->GetCPUTemp(0+i) + '\t';
+		output += to_string(getNode->kfcuV) + '\t' + to_string(getNode->kfcuA) + '\t' + to_string(getNode->kfcuW) + '\t';
+                
+		for (i = 0; i < numbigcores; i++)
+                        output +=  getNode->GetCPUCurFreq(4+i) + '\t' + getNode->GetCPUTemp(4+i) + '\t';
+		output += to_string(getNode->armuV) + '\t' + to_string(getNode->armuA) + '\t' + to_string(getNode->armuW) + '\t';
 		
-		getNode->GetINA231();
-		
-		a15Volt = to_string(getNode->armuV);
-    		a15Ampere = to_string(getNode->armuA);
-    		a15Watt = to_string(getNode->armuW);
-
-    		a7Volt = to_string(getNode->kfcuV);
-    		a7Ampere = to_string(getNode->kfcuA);
-    		a7Watt = to_string(getNode->kfcuW);
-
-    		gpuVolt = to_string(getNode->g3duV);
-    		gpuAmpere = to_string(getNode->g3duA);
-    		gpuWatt = to_string(getNode->g3duW);
-
-    		memVolt = to_string(getNode->memuV);
-    		memAmpere = to_string(getNode->memuA);
-    		memWatt = to_string(getNode->memuW);
-
-         	//need to build the command with the now read watt value, system only accepts const char* so need to convert string
-         	//This makes sure that the time value pronted usign date is as close to the measurement to watt as possible, having a preallocated command string to just append the watt value os the fastest way to generate the command to pass to system
-		string output = a7Volt + '\t' + a7Ampere + '\t' + a7Watt + '\t' + a15Volt + '\t' + a15Ampere + '\t' + a15Watt + '\t' + gpuVolt + '\t' + gpuAmpere + '\t' + gpuWatt + '\t' + memVolt + '\t' + memAmpere + '\t' + memWatt;
-		cmd.append(output);
+		output += getNode->GetGPUCurFreq() + '\t' + getNode->GetCPUTemp(numLITTLEcores+numbigcores) + '\t' + to_string(getNode->g3duV) + '\t' + to_string(getNode->g3duA) + '\t' + to_string(getNode->g3duW) + '\t' + to_string(getNode->memuV) + '\t' + to_string(getNode->memuA) + '\t' + to_string(getNode->memuW);
+		cmd += output;
 
          	system(cmd.c_str());
-        	//then remove the watt values to reset the boilerplate echo command, length of original string is already stored
+        	
+		//then remove the watt values to reset the boilerplate echo command, length of original string is already stored
 	        cmd.erase(len,output.length());
-		
 	
 		nanosleep(&sleep,NULL);
 	} 
