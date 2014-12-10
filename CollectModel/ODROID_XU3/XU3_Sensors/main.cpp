@@ -25,6 +25,7 @@ int main(int argc, char* argv[])
 {
 	int numLITTLEcores;
 	int numbigcores;
+	int nanosecs;
 
 	if (argc > 1) {
 		if (4 < (numLITTLEcores = atoi(argv[1])) < 0){
@@ -36,6 +37,11 @@ int main(int argc, char* argv[])
 			cerr << "Argument 2 must be enabled big cores" << endl;
 			exit(1);
 		}
+
+                if (4 <(nanosecs = atoi(argv[3])) < 0){
+                        cerr << "Argument 3 must be nanosecond interval" << endl;
+                        exit(1);
+                }
 		
 	}
 
@@ -68,7 +74,7 @@ int main(int argc, char* argv[])
 	string cmd="echo $(date +'%s%N')'\t'";
   	struct timespec sleep;
   	sleep.tv_sec = 0;
-	sleep.tv_nsec = 500000000;
+	sleep.tv_nsec = nanosecs;
 	int len=cmd.size();
 
 	// enable the sensors

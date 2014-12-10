@@ -2,7 +2,7 @@
 #Simple program to read information from the onboard sensors with a delay as an input.
 
 if (( $# != 1 )); then
-  echo "This program requires a wait input for the sensors in usecs." >&2
+  echo "This program requires a wait input for the sensors in nsecs." >&2
   exit 1
 fi
 
