@@ -105,7 +105,7 @@ do
 done
 
 while true; do
-	#This is to convert the user input of usecs to secs, required ofr the sleep call
+	#This is to convert the user input of nsecs to secs, required ofr the sleep call
 	sleep `echo "scale = 10; $SAMPLE_TIME/$time_convert;" | bc`
 	C=($(sed -n '2,9p' /proc/stat))
 	timestamp=$(date +'%s%N')

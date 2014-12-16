@@ -10,6 +10,7 @@ fi
 #Flags to enable different functionality
 BENCH_EXEC_CHOSEN=0
 SAVE_DIR_CHOSEN=0
+SAMPLE_TIME=0
 big_CHOSEN=0
 LITTLE_CHOSEN=0
 NUM_RUNS=0
@@ -18,7 +19,7 @@ LITTLE_FREQ=""
 
 #main loop b=big L=LITTLE s=save directory n=specify number of runs -t=benchmark directory -h=help
 #requires getops, but this should not be an issue since ints built in bash
-while getopts ":b:L:s:t:n:h" opt;
+while getopts ":b:L:s:x:t:n:h" opt;
 do
     case $opt in
         b|L)
@@ -52,18 +53,18 @@ do
 		    echo "selected frequency $freq_select for -$opt is out of bounds. Range is [$max_f;$min_f]"
                     exit 1
                 else
-	            if (( !$(grep -o " $freq_select " <<< "$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies)" | grep -c .) && "$freq_select" != max_f && "$freq_select" != min_f )); then
-			echo "Input frequency $freq_select for -$opt not present in frequency table located at /sys/devices/system/cpu/cpu0/cpufreq/scaling_availavle_frequencies "
-                        exit 1;
-                    else
+	            #if (( !$(grep -o " $freq_select " <<< "$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies)" | grep -c .) && "$freq_select" != max_f && "$freq_select" != min_f )); then
+			#echo "Input frequency $freq_select for -$opt not present in frequency table located at /sys/devices/system/cpu/cpu0/cpufreq/scaling_availavle_frequencies "
+                        #exit 1;
+                    #else
                         if [[ -z "$(eval echo \$$(eval echo "$core_select"_FREQ))" ]]; then
-                            eval "$core_select"_FREQ=$(echo "scale = 0; $freq_select/1000;" | bc )
+                            eval "$core_select"_FREQ=$freq_select
                         else 
                             eval "$core_select"_FREQ+=","
-                            eval "$core_select"_FREQ+=$(echo "scale = 0; $freq_select/1000;" | bc )
+                            eval "$core_select"_FREQ+=$freq_select
                         fi
                     fi
-                fi
+                #fi
             done
             ;;
         #Specify the save directory, if no save directory is chosen the results are saved in the $PWD
@@ -108,20 +109,35 @@ do
             fi
             ;;
         #specify the benchmark executable to be ran
-        t)
+        x)
             if (( $BENCH_EXEC_CHOSEN )); then
-                echo "Invalid input: option -t has already been used!" >&2
+                echo "Invalid input: option -x has already been used!" >&2
                 exit 1                
             fi
             #Make sure the benchmark directory selected exists
             if [[ ! -x $OPTARG ]]; then
-                echo "-t $OPTARG is not an executable file or does not exist. Please enter the bechmark executable script/program!" >&2 
+                echo "-x $OPTARG is not an executable file or does not exist. Please enter the bechmark executable script/program!" >&2 
                 exit 1
             else
                 bench_exec=$OPTARG
                 BENCH_EXEC_CHOSEN=1
             fi
             ;;
+
+        #specify the sensor sample time
+        t)
+            if (( $SAMPLE_TIME )); then
+                echo "Invalid input: option -t has already been used!" >&2
+                exit 1
+            fi
+            if (( !$OPTARG )); then
+                echo "Invalid input: option -n needs to have a positive integer!" >&2
+                exit 1
+            else
+                SAMPLE_TIME=$OPTARG
+            fi
+            ;;
+
         n)
             #Choose the number of runs. Data from different runs is saved in Run_(run number) subfolders in the save directory
             if (( $NUM_RUNS )); then
@@ -177,59 +193,90 @@ if (( !$BENCH_EXEC_CHOSEN )); then
     exit 1
 fi
 
+if (( !$SAMPLE_TIME )); then
+        echo "Invalid input: option -s (sample time) has not been specified!" >&2
+        exit 1
+fi
+
+sample_ns=$SAMPLE_TIME
+sample_ms=$(echo "scale = 0; $sample_ns/1000000;" | bc )
+
 #Set the environment
 ./enviroset.sh 1
 
 #loop to run benchmarks
 core_choices="big LITTLE"
+cpu_option=""
+cpu_number=""
 
 for core_select in $core_choices;
 do
     #Process only the cores the user has chosen 
     if (( "$core_select"_CHOSEN )); then
-
+	
+	if [[ $core_select == "big" ]]; then 
+		cpu_option="-b"
+		cpu_number=4
+        else	
+		cpu_option="-L"
+		cpu_number=0
+	fi
         #Run benchmarks for specified number of runs
         for i in `seq 1 $NUM_RUNS`;
         do
             
             echo "This is run $i out of $NUM_RUNS"            
+                
+		if (( $SAVE_DIR_CHOSEN )); then mkdir -v -p "$save_dir/Run_$i"
+		else mkdir -v "Run_$i"
+		fi
 
-            #Run collections scripts in parallel to the benchmarks
-            echo "#Collecting sensor data" > "sensors_data_$core_select.dat"
-            #./sensors_collect.sh $upd_period >> "sensors_data_$core_select.dat" &
-            #PID_sensors=$!
-            disown
-
-            echo "#Executing selected benchmarks" > "benchmarks_data_$core_select.dat"
             #Run benchmark for each specified core frequency 
             freq_list="$(eval echo \$$(eval echo "$core_select"_FREQ))"
             freq_list="${freq_list//,/ }"
             #Set header flag
-            bench_header_flag=1
 
             for freq_select in $freq_list
-	    do	
-                cpufreq-set -f $freq_select"Mhz"       
+	    do
+
+		cpufreq-set -d $freq_select -u $freq_select -c $cpu_number
+
 		echo "Core frequency: $freq_select""Mhz"
-            	./$bench_exec $bench_header_flag >> "benchmarks_data_$core_select.dat" 
-                #make sure header is printed only once, not everytime frequency is changed and the benchmarks are ran
-                bench_header_flag=0
+	        
+		#Run collections scripts in parallel to the benchmarks
+            	./sensors 1 1 $sample_ns > "sensors_""$core_select""$freq_select"".data" &
+            	PID_sensors=$!
+            	disown
+
+                #Run collections scripts in parallel to the benchmarks
+                ./get_cpu_usage.sh $cpu_option -t $sample_ns > "usage_""$core_select""$freq_select"".data" &
+                PID_usage=$!
+                disown
+
+            	./get_cpu_events.sh $cpu_option -s "benchmarks_""$core_select""$freq_select"".data" -x $bench_exec -t $sample_ms > "events_""$core_select""$freq_select"".data"
+
+	     	#after benchmarks have run kill sensor collect and smartpower (if chosen)
+            	sleep 1
+            	kill $PID_sensors > /dev/null 2>&1
+            	kill $PID_usage > /dev/null 2>&1
+            	sleep 1
+                
+	     	echo "Data collection completed successfully"
+
+            	#Organize results -> copy them in the save dir that is specified or put them in the PWD
+            	if (( $SAVE_DIR_CHOSEN )); then
+                        mkdir -v -p "$save_dir/Run_$i/""$core_select""$freq_select"
+                	echo "Copying results to chosen dir: $save_dir/Run_$i/""$core_select""$freq_select"
+                	cp -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_""$core_select""$freq_select"".data" "$save_dir/Run_$i/""$core_select""$freq_select"
+                	rm -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_""$core_select""$freq_select"".data"
+            	else
+			mkdir -v -p "Run_$i/""$core_select""$freq_select"
+               		echo "Copying results to dir: Run_$i/""$core_select""$freq_select"
+                        cp -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_""$core_select""$freq_select"".data" "Run_$i/""$core_select""$freq_select"
+                        rm -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_""$core_select""$freq_select"".data"
+            	fi
+
             done
-
-            echo "Data collection completed successfully"
-
-            #Organize results -> copy them in the save dir that is specified or put them in the PWD
-            if (( $SAVE_DIR_CHOSEN )); then
-                echo "Copying results to chosen dir: $save_dir/Run_$i"
-                mkdir -v -p "$save_dir/Run_$i"
-                cp -v "sensors_data_$core_select.dat" "benchmarks_data_$core_select.dat" "$save_dir/Run_$i"
-                rm -v "sensors_data_$core_select.dat" "benchmarks_data_$core_select.dat"
-            else
-                echo "Copying results to dir: Run_$i"
-                mkdir -v "Run_$i"
-                cp -v "sensors_data_$core_select.dat" "benchmarks_data_$core_select.dat" "Run_$i" 
-                rm -v "sensors_data_$core_select.dat" "benchmarks_data_$core_select.dat"
-            fi
 
         done
         echo "$core_select cores done"

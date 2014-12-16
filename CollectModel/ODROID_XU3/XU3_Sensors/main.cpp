@@ -76,7 +76,6 @@ int main(int argc, char* argv[])
   	sleep.tv_sec = 0;
 	sleep.tv_nsec = nanosecs;
 	int len=cmd.size();
-
 	// enable the sensors
 	if (getNode->OpenINA231()) {
 		cerr << "OpenINA231 error" << endl;
