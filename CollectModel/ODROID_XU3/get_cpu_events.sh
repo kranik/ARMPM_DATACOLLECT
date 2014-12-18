@@ -10,6 +10,7 @@ fi
 #Flags to enable different functionality
 BENCH_EXEC_CHOSEN=0
 BENCH_SAVE_CHOSEN=0
+EVENTS_SAVE_CHOSEN=0
 SAMPLE_TIME=0
 CPU=-1
 
@@ -71,6 +72,7 @@ do
             fi
             ;;
 
+
         h)
             echo "Available flags and options:" >&2
             echo "-b -> turn on collection for big core (CPU4)"
@@ -103,19 +105,16 @@ if (( $CPU == -1 )); then
 fi
 
 if (( !$BENCH_EXEC_CHOSEN )); then
-	echo "Invalid input: option -t (benchmark executble) has not been specified!" >&2
+	echo "Invalid input: option -x (benchmark executble) has not been specified!" >&2
 	exit 1
 fi
 
 if (( !$SAMPLE_TIME )); then
-        echo "Invalid input: option -s (sample time) has not been specified!" >&2
+        echo "Invalid input: option -t (sample time) has not been specified!" >&2
         exit 1
 fi
 
 #Programmable head line and column separator. By default I assume data start at line 3 (first line is descriptio, second is column heads and third is actual data). Columns separated by tab(s).
-head_line=3
-col_sep="\t"
-time_convert=1000000000
 
 ev1_name=r011
 ev2_name=r008
@@ -123,55 +122,15 @@ ev3_name=r001
 ev4_name=r003
 ev5_name=r017
 
-echo -e "#Timestamp\t$ev1_name\t$ev2_name\t$ev3_name\t$ev4_name\t$ev5_name"
-
-
-touch "del.tmp"
-starttime=$(date +'%s%N')
+echo -e "Start:\t$(date +'%s%N')" >&2
+echo -e "Event1 Name:\t$ev1_name" >&2
+echo -e "Event2 Name:\t$ev2_name" >&2
+echo -e "Event3 Name:\t$ev3_name" >&2
+echo -e "Event4 Name:\t$ev4_name" >&2
+echo -e "Event5 Name:\t$ev5_name" >&2
 
 #./perf stat -e cycles,instructions,cache-references,cache-misses -x "\t" -o "del.tmp" __run $j > /dev/null 2> /dev/null
-(( $BENCH_SAVE_CHOSEN )) && taskset -c $CPU ./perf stat -g --cpu $CPU -e $ev1_name,$ev2_name,$ev3_name,$ev4_name,$ev5_name -I $SAMPLE_TIME -x "\t" -o "del.tmp" $bench_exec > $bench_save #2> /dev/null
-(( !$BENCH_SAVE_CHOSEN )) && taskset -c $CPU ./perf stat -g --cpu $CPU -e $ev1_name,$ev2_name,$ev3_name,$ev4_name,$ev5_name -I $SAMPLE_TIME -x "\t" -o "del.tmp" $bench_exec > /dev/null 2> /dev/null
-
-for time in $(awk -v START=$head_line -v SEP=$col_sep '
-	BEGIN{FS = SEP}{
-		if (NR >= START){
-			val = $1;
-	                if (NR == START){
-			prev_time=val;
-				print val;
-			}else{
-				if (val != prev_time){
-					prev_time = val;
-					print val;
-				}
-			}
-		}
-	}' "del.tmp")
-do
-	ev1_data=$(awk -v START=$head_line -v SEP=$col_sep -v TIME=$time -v EVENT=$ev1_name '
-		BEGIN{FS = SEP}{
-			if (NR >= START && $1 == TIME && $3 == EVENT ) print $2
-		}' "del.tmp")
-	ev2_data=$(awk -v START=$head_line -v SEP=$col_sep -v TIME=$time -v EVENT=$ev2_name '
-		BEGIN{FS = SEP}{
-			if (NR >= START && $1 == TIME && $3 == EVENT ) print $2
-		}' "del.tmp")
-        ev3_data=$(awk -v START=$head_line -v SEP=$col_sep -v TIME=$time -v EVENT=$ev3_name '
-                BEGIN{FS = SEP}{
-                        if (NR >= START && $1 == TIME && $3 == EVENT ) print $2
-                }' "del.tmp")
-        ev4_data=$(awk -v START=$head_line -v SEP=$col_sep -v TIME=$time -v EVENT=$ev4_name '
-                BEGIN{FS = SEP}{
-                        if (NR >= START && $1 == TIME && $3 == EVENT ) print $2
-                }' "del.tmp")
-        ev5_data=$(awk -v START=$head_line -v SEP=$col_sep -v TIME=$time -v EVENT=$ev5_name '
-                BEGIN{FS = SEP}{
-                        if (NR >= START && $1 == TIME && $3 == EVENT ) print $2
-                }' "del.tmp")
-	nanotime=$(echo "scale = 0; ($starttime+($time*$time_convert))/1;" | bc )
-	echo -e "$nanotime\t$ev1_data\t$ev2_data\t$ev3_data\t$ev4_data\t$ev5_data"
-done
-rm "del.tmp"
+(( $BENCH_SAVE_CHOSEN )) && taskset -c $CPU ./perf stat -g --cpu $CPU -e $ev1_name,$ev2_name,$ev3_name,$ev4_name,$ev5_name -I $SAMPLE_TIME -x "\t" $bench_exec > $bench_save #2> /dev/null
+(( !$BENCH_SAVE_CHOSEN )) && taskset -c $CPU ./perf stat -g --cpu $CPU -e $ev1_name,$ev2_name,$ev3_name,$ev4_name,$ev5_name -I $SAMPLE_TIME -x "\t" $bench_exec > /dev/null #2> /dev/null
 
 

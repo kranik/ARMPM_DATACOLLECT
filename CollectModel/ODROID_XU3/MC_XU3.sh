@@ -253,7 +253,7 @@ do
                 PID_usage=$!
                 disown
 
-            	./get_cpu_events.sh $cpu_option -s "benchmarks_""$core_select""$freq_select"".data" -x $bench_exec -t $sample_ms > "events_""$core_select""$freq_select"".data"
+            	./get_cpu_events.sh $cpu_option -s "benchmarks_""$core_select""$freq_select"".data" -x $bench_exec -t $sample_ms 2> "events_raw_""$core_select""$freq_select"".data" 
 
 	     	#after benchmarks have run kill sensor collect and smartpower (if chosen)
             	sleep 1
@@ -267,13 +267,13 @@ do
             	if (( $SAVE_DIR_CHOSEN )); then
                         mkdir -v -p "$save_dir/Run_$i/""$core_select""$freq_select"
                 	echo "Copying results to chosen dir: $save_dir/Run_$i/""$core_select""$freq_select"
-                	cp -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_""$core_select""$freq_select"".data" "$save_dir/Run_$i/""$core_select""$freq_select"
-                	rm -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_""$core_select""$freq_select"".data"
+                	cp -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_raw_""$core_select""$freq_select"".data" "$save_dir/Run_$i/""$core_select""$freq_select"
+                	rm -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_raw_""$core_select""$freq_select"".data"
             	else
 			mkdir -v -p "Run_$i/""$core_select""$freq_select"
                		echo "Copying results to dir: Run_$i/""$core_select""$freq_select"
-                        cp -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_""$core_select""$freq_select"".data" "Run_$i/""$core_select""$freq_select"
-                        rm -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_""$core_select""$freq_select"".data"
+                        cp -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_raw_""$core_select""$freq_select"".data" "Run_$i/""$core_select""$freq_select"
+                        rm -v "sensors_""$core_select""$freq_select"".data" "usage_"$core_select"$freq_select"".data" "benchmarks_""$core_select""$freq_select"".data" "events_raw_""$core_select""$freq_select"".data"
             	fi
 
             done
