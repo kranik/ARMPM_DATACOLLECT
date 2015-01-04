@@ -116,11 +116,11 @@ fi
 
 #Programmable head line and column separator. By default I assume data start at line 3 (first line is descriptio, second is column heads and third is actual data). Columns separated by tab(s).
 
-ev1_name=r011
-ev2_name=r008
-ev3_name=r001
-ev4_name=r003
-ev5_name=r017
+ev1_name=r011 #cycles
+ev2_name=r004 #l1 dcache access
+ev3_name=r014 #l1 icache access 
+ev4_name=r008 #instructions 
+ev5_name=r013 #mem access
 
 echo -e "Start:\t$(date +'%s%N')" >&2
 echo -e "Event1 Name:\t$ev1_name" >&2
