@@ -125,7 +125,7 @@ while true; do
         	CPUs_guest[$i]=$(echo "scale=2; (100 * (${C[$i*11+9]} - ${A[$i*11+9]}) / (${CPUs_nd[$i]} - ${CPUs_st[$i]}))" | bc)
         	CPUs_guest_nice[$i]=$(echo "scale=2; (100 * (${C[$i*11+10]} - ${A[$i*11+10]}) / (${CPUs_nd[$i]} - ${CPUs_st[$i]}))" | bc)
 	
-		echo -e "$timestamp\tCPU_${CPUs[$i]}\t${CPUs_user[$i]}\t${CPUs_nice[$i]}\t${CPUs_sys[$i]}\t${CPUs_idle[$i]}\t${CPUs_iowait[$i]}\t${CPUs_irq[$i]}\t${CPUs_softiq[$i]}\t${CPUs_steal[$i]}\t${CPUs_guest[$i]}\t${CPUs_fuest_nice[$i]}"
+		echo -e "$timestamp\tCPU_${CPUs[$i]}\t${CPUs_user[$i]}\t${CPUs_nice[$i]}\t${CPUs_sys[$i]}\t${CPUs_idle[$i]}\t${CPUs_iowait[$i]}\t${CPUs_irq[$i]}\t${CPUs_softiq[$i]}\t${CPUs_steal[$i]}\t${CPUs_guest[$i]}\t${CPUs_guest_nice[$i]}"
 		#Use C as the new A (old values)
 		for j in `seq 1 10`
 		do
