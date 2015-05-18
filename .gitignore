@@ -38,6 +38,4 @@ Thumbs.db
 
 # Project-specific files and folders #
 ######################################
-Benchmarks/*
-BuildModel/*
-.gitignore
+Workloads/*

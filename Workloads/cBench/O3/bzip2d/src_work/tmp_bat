@@ -1,1 +1,0 @@
-time ./a.out -d -k -f -c ../../bzip2_data/1.bz2 > ftmp_out
