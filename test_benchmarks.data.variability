@@ -1,0 +1,16 @@
+#Benchmark	Varability big	Variability LITTLE
+consumer_jpeg_d	71.147	78.712
+security_blowfish_e	94.27	94.114
+security_pgp_d	78.179	82.361
+office_ghostscript	91.999	91.413
+network_dijkstra	87.867	87.789
+security_blowfish_d	94.545	93.876
+automotive_susan_e	94.492	88.627
+automotive_qsort1	91.468 91.055
+automotive_bitcount	92.769	93.865
+security_rijndael_e	69.969	82.272
+telecom_adpcm_c	94.386	93.592
+bzip2e	91.302	80.045
+network_patricia	91.777	90.741
+office_rsynth	94.882	93.576
+consumer_tiff2bw	77.45	81.818
