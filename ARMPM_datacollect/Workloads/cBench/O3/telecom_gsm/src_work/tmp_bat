@@ -1,0 +1,1 @@
+time ./a.out -fps -c ../../telecom_gsm_data/1.au > output_large.encode.gsm
