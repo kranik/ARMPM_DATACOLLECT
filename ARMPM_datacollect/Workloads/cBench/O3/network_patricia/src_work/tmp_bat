@@ -1,1 +1,0 @@
-time ./a.out ../../network_patricia_data/1.udp > output_large.txt

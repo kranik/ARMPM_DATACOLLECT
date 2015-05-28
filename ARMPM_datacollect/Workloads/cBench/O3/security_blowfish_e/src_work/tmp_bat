@@ -1,1 +1,0 @@
-time ./a.out e ../../office_data/1.txt output_large.enc 1234567890abcdeffedcba0987654321  > ftmp_out

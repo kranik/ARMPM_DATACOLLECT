@@ -1,1 +1,0 @@
-time ./a.out -a -q -o large_output.au < ../../office_data/1.txt > ftmp_out 2> ftmp_out1
