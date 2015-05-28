@@ -21,7 +21,7 @@ git pull -s subtree buildmodel master --squash
 git pull -s subtree datacollect master --squash
 
 #4) If you want to push/pull to subtrees do it with 
-git subtree push(pull) -P ARMPM/ARMPM_buildmodel --squash buildmodel master
+git subtree push(pull) -P ARMPM_buildmodel --squash buildmodel master
 
-git subtree push(pull) -P ARMPM/ARMPM_datacollect --squash datacollect master
+git subtree push(pull) -P ARMPM_datacollect --squash datacollect master
 
