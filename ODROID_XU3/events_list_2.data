@@ -1,0 +1,2 @@
+CPU cycles,Instructions architecturally executed,Exceptions taken,Predictable branch speculatively executed,Mispredicted or not predicted branch speculatively executed
+r0FF,r008,r009,r012,r010
