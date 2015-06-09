@@ -1,0 +1,2 @@
+cycles,instructions speculative,integer operations speculative,floating point operations speculative,L1 data access,L2 access,L2 refill(miss)
+r0FF,r01B,r073,r075,r004,r016,r017

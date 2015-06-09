@@ -1,0 +1,2 @@
+CPU cycles,L1 Data Cache access,L1 Instructions Cache access,L2 Data Cache access,Bus Access
+r0FF,r004,r014,r016,r019
