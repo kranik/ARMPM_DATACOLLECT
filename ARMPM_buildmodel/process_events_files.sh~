@@ -1,0 +1,202 @@
+#!/bin/bash
+
+if [[ "$#" -eq 0 ]]; then
+  echo "This program requires inputs. Type -h for help." >&2
+  exit 1
+fi
+
+
+#Programmable head line and column separator. By default I assume data start at line 1 (first line is description, second is column heads and third is actual data). Columns separated by tab(s).
+head_line=1
+col_sep="\t"
+time_convert=1000000000
+
+#requires getops, but this should not be an issue since ints built in bash
+while getopts ":r:n:e:sh" opt;
+do
+    case $opt in
+        h)
+        	echo "Available flags and options:" >&2
+        	echo "-r [DIRECTORY] -> Specify the save directory for the results of the different runs."
+        	echo "-n [RUNS] -> specify list of runs to be concatenated. -n 3 for run Number 3. -n 1,3 for runs 1 and 3."
+        	echo "-e [FILE] -> Specify the events names file"
+        	cho "Mandatory options are: ..."
+        	exit 0 
+        ;;
+
+        #Specify the save directory, if no save directory is chosen the results are saved in the $PWD
+        r)
+            if [[ -n  $RESULTS_DIR ]]; then
+                echo "Invalid input: option -r has already been used!" >&2
+                exit 1                
+            fi
+            #If the directory exists, ask the user if he really wants to reuse it. I do not accept symbolic links as a save directory.
+            if [[ ! -d $OPTARG ]]; then
+                    echo "Directory specified with -r flag does not exist" >&2
+                    exit 1
+            else
+                #directory does exists and we can analyse results
+                RESULTS_DIR=$OPTARG
+				NUM_RUNS=$(ls $RESULTS_DIR | grep 'Run' | wc -w)
+				if [[ $NUM_RUNS -eq 0 ]]; then
+                	echo "Directory specified with -r flag does not contain any results." >&2
+            		exit 1                
+        		else
+        			if [[ $(find $RESULTS_DIR -type d -name 'LITTLE' | wc -w) -gt 0 ]]; then
+        				CORETYPE="LITTLE"
+    					CPU_P_col=6
+						CPU_V_col=4
+						CPU_T_col=3		
+        			elif [[ $(find $RESULTS_DIR -type d -name 'big' | wc -w) -gt 0 ]]; then
+        				CORETYPE="big"
+    					CPU_P_col=11
+						CPU_V_col=9
+						CPU_T_col=8
+        			else	
+	                	echo "Directory specified with -r flag does not specify core type." >&2
+	            		exit 1                        				
+        			fi
+        		fi
+        		    	
+            fi
+            ;;
+                        
+        #Specify if yo uwant to save resutls file where events_raw file was (easier scripts) if not print on stdout
+        s)
+        	if [[ -n $SAVE ]]; then
+            	echo "Invalid input: option -s has already been used!" >&2
+            	exit 1                
+        	else
+            	SAVE=1
+        	fi
+            ;;
+
+        n)
+			if [[ -n $RUNS ]]; then
+					echo "Invalid input: option -f has already been used!" >&2
+					exit 1
+			fi
+
+			spaced_OPTARG="${OPTARG//,/ }"
+
+			#Go throught the selected frequecnies and make sure they are not out of bounds
+			#Also make sure they are present in the frequency table located at /sys/devices/system/cpu/cpufreq/iks-cpufreq/freq_table because the kernel rounds up
+			#Specifying a higher/lower frequency or an odd frequency is now wrong, jsut the kernel handles it in the background and might lead to collection of unwanted resutls
+			for RUN_SELECT in $spaced_OPTARG
+			do
+				if [[ $RUN_SELECT -gt $NUM_RUNS || $RUN_SELECT -lt 1 ]]; then 
+					echo "selected run $RUN_SELECT for -$opt is out of bounds. Runs are [1:$NUM_RUNS]"
+					exit 1
+				else
+			[[ -z "$RUNS" ]] && RUNS="$RUN_SELECT" || RUNS+=" $RUN_SELECT"
+					fi
+			done
+			;;
+			
+		#specify the benchmark executable to be ran
+        e)
+            if [[ -n $EVENTS_LIST_FILE ]]; then
+                echo "Invalid input: option -e has already been used!" >&2
+                exit 1
+            fi
+            #Make sure the benchmark directory selected exists
+            if ! [[ -e "$OPTARG" ]]; then
+                echo "-e $OPTARG does not exist. Please enter the events list file!" >&2
+                exit 1
+            else
+                EVENTS_LIST_FILE="$OPTARG"
+            fi
+            ;;
+                       
+        :)
+            echo "Option: -$OPTARG requires an argument" >&2
+            exit 1
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -z $RESULTS_DIR ]]; then
+    	echo "Nothing to run. Expected -r flag!" >&2
+    	exit 1
+fi
+
+if [[ -z $RUNS ]]; then
+    	echo "Nothing to run. Expected -n flag!" >&2
+    	exit 1
+fi
+
+if [[ -z $EVENTS_LIST_FILE ]]; then
+        echo "Invalid input: option -e (events list) has not been specified!" >&2
+        exit 1
+fi
+
+
+FREQ_LIST=$(ls $RESULTS_DIR/Run_${RUNS%% *} | tr " " "\n" | sort -gr | tr "\n" " ")
+
+EVENTS_LABELS=$(awk -v START=1 '{if (NR == START) {print $0}}' < $EVENTS_LIST_FILE | tr "," "\t")
+
+IFS=',' read -a EVENTS_RAW <<< "$(awk -v START=2 '{if (NR == START) {print $0}}' $EVENTS_LIST_FILE)"
+
+echo $EVENTS_LABELS
+
+for i in `seq 0 $(( ${#EVENTS_RAW[@]} - 1 ))`
+do
+	echo ${EVENTS_RAW[$i]}
+done
+
+
+	
+for i in $RUNS;
+do
+	for FREQ_SELECT in $FREQ_LIST
+	do 
+		EVENTS_RAW_FILE="$RESULTS_DIR/Run_$i/$FREQ_SELECT/events_raw.data"	        
+	   
+	   	if [[ -z $SAVE ]]; then
+			echo -e "#Timestamp\t$EVENTS_LABELS"
+		else
+		   	#Save results
+			EVENTS_FILE="$RESULTS_DIR/Run_$i/$FREQ_SELECT/events.data"
+			echo -e "#Timestamp\t$EVENTS_LABELS" > $EVENTS_FILE
+		fi
+		
+		for linenum in $(seq $((1+1+${#EVENTS_RAW[@]})) ${#EVENTS_RAW[@]} $(wc -l $EVENTS_RAW_FILE | awk '{print $1}')) 
+		do
+			time=$(awk -v START=$linenum -v SEP=$col_sep '
+				BEGIN{
+					FS = SEP
+				}{
+					if(NR==START){
+						print $1;
+						exit;
+					}
+				}' $EVENTS_RAW_FILE)
+			for i in `seq $linenum 1 $(( $linenum + ${#EVENTS_RAW[@]} - 1 ))`
+			do
+				DATA=$(awk -v START=$i -v SEP=$col_sep '
+				BEGIN{
+					FS = SEP
+				}{
+					if(NR==START){
+						print $2;
+						exit;
+					}
+				}' $EVENTS_RAW_FILE)
+				echo "DATA=$DATA"
+				EVENTS_DATA+="\t$DATA"
+			done
+		
+			#Convert time
+			starttime=$(awk -v START=1 -v SEP='\t' 'BEGIN{FS = SEP}{ if (NR == START){print $2;}}' $EVENTS_RAW_FILE)
+			nanotime=$(echo "scale = 0; ($starttime+($time*$time_convert))/1;" | bc )
+			
+			[[ -z $SAVE ]] && echo -e "$nanotime\t$EVENTS_DATA" || echo -e "$nanotime\t$EVENTS_DATA" >> $EVENTS_FILE
+			EVENTS_DATA=""
+		done
+		
+	done
+done

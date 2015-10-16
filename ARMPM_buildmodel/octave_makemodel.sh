@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#freq=([1]=2000000 1900000 1800000 1700000 1600000 1500000 1400000 1300000 1200000 1100000 1000000 900000 800000 700000 600000 500000 400000 300000 200000 100000)
+freq=([1]=2000000 1900000 1800000 1700000 1600000 1500000 1400000 1300000 1200000 1100000 1000000 900000 800000 700000 600000 500000 400000 300000 200000 100000)
 #freq=([1]=100000 200000 300000 400000 500000 600000 700000 800000 900000 1000000 1100000 1200000 1300000 1400000 1500000 1600000 1700000 1800000 1900000 2000000)
-freq=([1]=1400000 1300000 1200000 1100000 1000000 900000 800000 700000 600000 500000 400000 300000 200000 100000)
+#freq=([1]=1400000 1300000 1200000 1100000 1000000 900000 800000 700000 600000 500000 400000 300000 200000 100000)
 #freq=([1]=100000 200000 300000 400000 500000 600000 700000 800000 900000 1000000 1100000 1200000 1300000 1400000)
 
 #cp Full_Freq_Results/LITTLE_full.data "model_input.data"
@@ -23,25 +23,26 @@ freq=([1]=1400000 1300000 1200000 1100000 1000000 900000 800000 700000 600000 50
 #octave --silent --eval "load_build_model(2000000,100000)" 2> /dev/null 1>> "octave_model.temp"
  
 #: <<'SKIP1'
-#for i in `seq 1 19`
-for i in `seq 1 13`
+for i in `seq 1 19`
+#for i in `seq 1 13`
 do
+	echo $((${freq[$i]}/1000))
+	./freq_extract.sh $1	$((${freq[$i]}/1000))
+	cp "model_input.data" "test_set.data"
 
-	./freq_extract.sh Full_Freq_Results/LITTLE_power_big_events_averaged.data	${freq[$i]}
-	./split_data.sh 
-	echo ${freq[$i]}
-	mv "train_set.data" "train_set_full.data"
-	./freq_extract.sh Full_Freq_Results/LITTLE_power_big_events_averaged.data ${freq[$i]}
-	./split_data.sh
-	mv "train_set_full.data" "train_set.data"
+#	mv "train_set.data" "train_set_full.data"
+#	./freq_extract.sh Full_Freq_Results/LITTLE_power_big_events_averaged.data ${freq[$i]}
+#	./split_data.sh
+#	mv "train_set_full.data" "train_set.data"
 
-	octave --silent --eval "load_build_model(${freq[$i]},${freq[$i+1]})" 2> /dev/null 1>> "octave_model.temp"
+	octave --silent --eval "load_build_model($((${freq[$i]}/1000)),$((${freq[$i+1]}/1000)))" 2> /dev/null 1>> "octave_model.temp"
 done
 #SKIP1
 
 #Replace dots with commas for GOGOLE docs
 
-sed 's/\./,/g' "octave_model.temp" > "model_replaced.temp"
+#sed 's/\./,/g' "octave_model.temp" > "model_replaced.temp"
+cp "octave_model.temp" "model_replaced.temp"
 
 #: <<'SKIP2'
 
@@ -52,6 +53,7 @@ awk '{
 		print $5 }
 	}' "model_replaced.temp"
 echo -e "===================="
+:<<'skipower'
 echo -e "Predicted Power Range"
 awk '{
 		if ($1=="Predicted" && $2=="Power"){ 
@@ -59,6 +61,7 @@ awk '{
 	}' "model_replaced.temp"
 	
 echo -e "===================="	
+skipower
 echo -e "===================="
 echo -e "Average Power"
 awk '{
@@ -72,6 +75,53 @@ awk '{
 		print $4 }
 	}' "model_replaced.temp"	
 echo -e "===================="
+echo -e "===================="
+echo -e "Average Curr."
+awk '{
+		if ($1=="Average" && $2=="Current"){ 
+		print $4 }
+	}' "model_replaced.temp"	
+echo -e "===================="
+echo -e "===================="
+echo -e "Voltage Level"
+awk '{
+		if ($1=="Voltage" && $2=="Level"){ 
+		print $4 }
+	}' "model_replaced.temp"	
+echo -e "===================="
+
+echo -e "===================="
+echo -e "Average Ev1."
+awk '{
+		if ($1=="Average" && $2=="Ev1"){ 
+		print $4 }
+	}' "model_replaced.temp"	
+echo -e "===================="
+echo -e "Average Ev2."
+awk '{
+		if ($1=="Average" && $2=="Ev2"){ 
+		print $4 }
+	}' "model_replaced.temp"	
+echo -e "===================="
+echo -e "Average Ev3."
+awk '{
+		if ($1=="Average" && $2=="Ev3"){ 
+		print $4 }
+	}' "model_replaced.temp"	
+echo -e "===================="
+echo -e "Average Ev4."
+awk '{
+		if ($1=="Average" && $2=="Ev4"){ 
+		print $4 }
+	}' "model_replaced.temp"	
+echo -e "===================="
+echo -e "Average Ev5."
+awk '{
+		if ($1=="Average" && $2=="Ev5"){ 
+		print $4 }
+	}' "model_replaced.temp"	
+echo -e "===================="
+:<<'skiperr'
 echo -e "===================="
 echo -e "Average Error"	
 awk '{
@@ -90,7 +140,9 @@ awk '{
 		if ($1=="Normalised"){ 
 		print $5 }
 	}' "model_replaced.temp"
-	
+
+skiperr
+
 #SKIP2
 
 : <<'SKIP3'

@@ -1,8 +1,8 @@
 function [] = load_build_model (freq_find,freq_next)
 #blabla
-  fid = fopen ("/home/vokris/Work/ARM_PowerModel/BuildModel/train_set.data", "r");
-  train_set = dlmread(fid,'\t',1,1);
-  fclose (fid);
+%  fid = fopen ("/home/vokris/Work/ARM_PowerModel/BuildModel/train_set.data", "r");
+%  train_set = dlmread(fid,'\t',1,1);
+%  fclose (fid);
 
   ###########################################################
   # Step 2: Invoke build_model on a and Y to calculate model
@@ -27,7 +27,7 @@ function [] = load_build_model (freq_find,freq_next)
   
 %  train_reg=[ones(size(train_set,1),1),train_set(:,2),train_set(:,3),train_set(:,4),train_set(:,5:9)]; #physical + PMU events
 
-  train_reg=[ones(size(train_set,1),1),train_set(:,2),train_set(:,3),train_set(:,4),train_set(:,5:9),train_set(:,10:15)]; #final
+%  train_reg=[ones(size(train_set,1),1),train_set(:,[2,3,4,5:9,10:15]); #final
 
   #CSR MODEL
 %  int_train_reg=train_set(:,7)./train_set(:,6);
@@ -55,26 +55,26 @@ function [] = load_build_model (freq_find,freq_next)
 %
 
 
-  [m, Err, CLow, CHigh] = build_model(train_reg,train_set(:,1));
+%  [m, Err, CLow, CHigh] = build_model(train_reg,train_set(:,1));
 
   ###########################################################
   # Step 3: Inspect and evaluata model quality
   ###########################################################
 
-  format
-
-  disp("###########################################################");
-  disp("Model coefficients:");    # Print model coefficients
-  disp(["Coeff: " num2str(m')]);
+%  format
+%
+%  disp("###########################################################");
+%  disp("Model coefficients:");    # Print model coefficients
+%  disp(["Coeff: " num2str(m')]);
 
   %disp("Model quality measures:");
 
-  mean_Error  = mean(Err);
+%  mean_Error  = mean(Err);
   %disp("  Average model error [%]:");     # Print average model error
   %disp(["    "  num2str(mean_Error*100)]); # This should be very close to 0
   %disp("");
 
-  std_Error   = std(Err);
+%  std_Error   = std(Err);
   %disp("  Standard deviation of model error [%]:");   # Print std of model error
   %disp(["    "  num2str(std_Error*100)]);              # The lower the beter
   %disp("");
@@ -90,7 +90,7 @@ function [] = load_build_model (freq_find,freq_next)
 
 
 
-  skew_Error = skewness(Err);
+%  skew_Error = skewness(Err);
   %disp("  Skewness:");                        # Skweness = 0 means symmetric distribution
   %disp(["    "  num2str(skew_Error)]);    #
   %disp("");
@@ -99,7 +99,7 @@ function [] = load_build_model (freq_find,freq_next)
   %    disp("Warning: Error distribution seems to be skewed");
   %endif
 
-  kurt_Error = kurtosis(Err);
+%  kurt_Error = kurtosis(Err);
   %disp("  Kurtosis:");                        # Kurtosis = 0 for normal distributin, >0 for more "pointy"/"peaked" distributions
   %disp(["    "  num2str(kurt_Error)]);    # and < 0 for more "short"/"wide" distributions (compared to normal distribution)
   %disp("");
@@ -152,21 +152,20 @@ function [] = load_build_model (freq_find,freq_next)
   # Step 3: Additional validity for test set
   ###########################################################
 
-  fid = fopen ("/home/vokris/Work/ARM_PowerModel/BuildModel/test_set.data", "r");
-  test_set = dlmread(fid,'\t',1,1);
+  fid = fopen ("/home/vokris/Work/ARMPM/ARMPM_buildmodel/test_set.data", "r");
+  test_set = dlmread(fid,'\t',1,3);
   fclose (fid);
 
   #Coefficient computation
-
   for  idx = 1:size(test_set,1)
-    if test_set(idx,3) == freq_find
+    if test_set(idx,1) == freq_find
       break;
     endif
   endfor
   st=idx;
 
   for  idx = st:size(test_set,1)
-    if test_set(idx,3) == freq_next
+    if test_set(idx,1) == freq_next
       break;
     endif
   endfor
@@ -187,7 +186,7 @@ function [] = load_build_model (freq_find,freq_next)
   
 %  test_reg=[ones(size(test_set,1),1),test_set(:,2),test_set(:,3),test_set(:,4),test_set(:,5:9)]; #physical + PMU
 %
-  test_reg=[ones(size(test_set,1),1),test_set(:,2),test_set(:,3),test_set(:,4),test_set(:,5:9),test_set(:,10:15)]; #full
+%  test_reg=[ones(size(test_set,1),1),test_set(:,4:7)]; #full
     
   
   #CSR MODEL
@@ -215,47 +214,52 @@ function [] = load_build_model (freq_find,freq_next)
   
   #mean(train_set(:,coeff_column))
   #mean(test_set(:,coeff_column))
-  
 
-  test_power=test_set(st:nd,1);
-  pred_power=test_reg(st:nd,:)*m;
+  test_power=test_set(st:nd,5);
+%  pred_power=test_reg(st:nd,:)*m;
   
   maxMP=max(test_power)
   minMP=min(test_power)
   
-  maxMT=max(test_set(st:nd,4));
-  minMT=min(test_set(st:nd,4));
+%  maxMT=max(test_set(st:nd,4));
+%  minMT=min(test_set(st:nd,4));
   
-  maxPP=max(pred_power);
-  minPP=min(pred_power);
+%  maxPP=max(pred_power);
+%  minPP=min(pred_power);
   
-  error=(abs(pred_power-test_power))./abs(test_power);
-  average_err=mean(error);
-  std_dev_err=std(error);
+%  error=(abs(pred_power-test_power))./abs(test_power);
+%  average_err=mean(error);
+%  std_dev_err=std(error);
   
-  ms_err=mean((pred_power-test_power).^2);
-  rms_err=sqrt(ms_err);
-  norm_rms_err=rms_err/mean(test_power);
-  
+%  ms_err=mean((pred_power-test_power).^2);
+%  rms_err=sqrt(ms_err);
+%  norm_rms_err=rms_err/mean(test_power);
 
   disp("###########################################################");
   disp("Model validation against test set");
   disp("###########################################################");
 
   disp(["Measured Power Range [%]: " num2str(100*(abs(maxMP-minMP)/abs(minMP)))]);  # Print Test Set power range
-  disp(["Predicted Power Range [%]: " num2str(100*(abs(maxPP-minPP)/abs(minPP)))]);  # Print predicted power range. Should be close to measured power range
-  
+%  disp(["Predicted Power Range [%]: " num2str(100*(abs(maxPP-minPP)/abs(minPP)))]);  # Print predicted power range. Should be close to measured power range
+
   disp(["Average Power [W]: " num2str(mean(test_power))]);  # Print test Set average power
-  disp(["Average Temperature [C]: " num2str(mean(test_set(st:nd,4)))]);  # Print Test Set power range
+  disp(["Average Temperature [C]: " num2str(mean(test_set(st:nd,2)))]);  # Print Test Set power range
+  disp(["Average Current [A]: " num2str(mean(test_set(st:nd,4)))]);  # Print Test Set power range
+  disp(["Voltage Level [A]: " num2str(mean(test_set(st:nd,3)))]);  # Print Test Set power range
+  disp(["Average Ev1 [#]: " num2str(mean(test_set(st:nd,7)))]);  # Print Test Set power range
+  disp(["Average Ev2 [#]: " num2str(mean(test_set(st:nd,8)))]);  # Print Test Set power range
+  disp(["Average Ev3 [#]: " num2str(mean(test_set(st:nd,9)))]);  # Print Test Set power range
+  disp(["Average Ev4 [#]: " num2str(mean(test_set(st:nd,10)))]);  # Print Test Set power range
+  disp(["Average Ev5 [#]: " num2str(mean(test_set(st:nd,11)))]);  # Print Test Set power range
   
-  disp(["Average Error [%]: " num2str(average_err*100)]);  # Print average model error. Should be close to 0.
-  disp(["Standart Deviation Error [%]: " num2str(std_dev_err*100)]);  # Print standart deviation of model error. The lower the better.
-  disp(["Normalised RMS Error [%]: " num2str(norm_rms_err*100)]);  # Print average model RMS error
+%  disp(["Average Error [%]: " num2str(average_err*100)]);  # Print average model error. Should be close to 0.
+%  disp(["Standart Deviation Error [%]: " num2str(std_dev_err*100)]);  # Print standart deviation of model error. The lower the better.
+%  disp(["Normalised RMS Error [%]: " num2str(norm_rms_err*100)]);  # Print average model RMS error
   
-  disp("###########################################################");
-  disp("One line");
-  disp("###########################################################");
-  disp([num2str(100*(abs(maxMP-minMP)/abs(minMP))) " " num2str(100*(abs(maxPP-minPP)/abs(minPP))) " " num2str(average_err*100) " " num2str(std_dev_err*100) " " num2str(norm_rms_err*100)]);
+%  disp("###########################################################");
+%  disp("One line");
+%  disp("###########################################################");
+%  disp([num2str(100*(abs(maxMP-minMP)/abs(minMP))) " " num2str(100*(abs(maxPP-minPP)/abs(minPP))) " " num2str(average_err*100) " " num2str(std_dev_err*100) " " num2str(norm_rms_err*100)]);
   
   #Extra stuff
 %  disp("###########################################################");

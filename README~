@@ -1,0 +1,25 @@
+#Power Model generation for ARM.
+#Kris Nikov 2015
+
+
+#How to install subtrees:
+
+#1) First use git clone on the main directory
+git clone git@github.com:kranik/ARMPM.git
+
+
+#2) Then add remotes (or just what you need) 
+git remote add buildmodel git@github.com:kranik/ARMPM_buildmodel.git
+git fetch buildmodel
+
+git remote add datacollect git@github.com:kranik/ARMPM_datacollect.git
+git fetch datacollect
+
+#3) Then merge the subtree
+git pull -s subtree buildmodel master --squash
+git pull -s subtree datacollect master --squash
+
+#4) If you want to push/pull to subtrees do it with 
+git subtree push(pull) -P ARMPM/ARMPM_buildmodel --squash buildmodel master
+git subtree push(pull) -P ARMPM/ARMPM_datacollect --squash datacollect master
+
