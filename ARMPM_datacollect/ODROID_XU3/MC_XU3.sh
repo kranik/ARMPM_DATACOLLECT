@@ -27,34 +27,34 @@ do
             ;;
         b|L)
             #Make sure command has not already been processed (flag is unset)
-			if [[ -n $CORE_CHOSEN ]]; then
-				echo "Invalid input: option -b or -L has already been used!" >&2
-				exit 1
-			fi
-		            
-			if ! [[ "$OPTARG" =~ ^[1-4]$ ]]; then
-				echo "Invalid input: $OPTARG needs to be 1-4 (number of cores)!" >&2
-				exit 1
-			fi
+            	if [[ -n $CORE_CHOSEN ]]; then
+                	echo "Invalid input: option -b or -L has already been used!" >&2
+                	exit 1
+		fi
+                
+		if ! [[ "$OPTARG" =~ ^[1-4]$ ]]; then
+                	echo "Invalid input: $OPTARG needs to be 1-4 (number of cores)!" >&2
+			exit 1
+		fi
 
-			if [[ $opt == b ]]; then
-				MAX_CORE=7
-				MIN_CORE=4
-				CORE_COLLECT_FREQ=1400000
-		        MAX_F=2000000
-				MIN_F=200000
-			else
-				MAX_CORE=3
-				MIN_CORE=0
-				CORE_COLLECT_FREQ=2000000
-				MAX_F=1400000
-				MIN_F=200000
-			fi
-		           	
-			CORE_CHOSEN="$OPTARG"
-			;;
+		if [[ $opt == b ]]; then
+			MAX_CORE=7
+			MIN_CORE=4
+			CORE_COLLECT_FREQ=1400000
+               		MAX_F=2000000
+             		MIN_F=200000
+               	else
+			MAX_CORE=3
+			MIN_CORE=0
+			CORE_COLLECT_FREQ=2000000
+               		MAX_F=1400000
+               		MIN_F=200000
+              	fi
+               	
+		CORE_CHOSEN="$OPTARG"
+		;;
 
-		f)
+	f)
                 if [[ -n $CORE_FREQ ]]; then
                         echo "Invalid input: option -f has already been used!" >&2
                         exit 1
@@ -78,41 +78,41 @@ do
 
         #Specify the save directory, if no save directory is chosen the results are saved in the $PWD
         s)
-        	if [[ -n $SAVE_DIR ]]; then
-            	echo "Invalid input: option -s has already been used!" >&2
-            	exit 1                
-        	fi
+		if [[ -n $SAVE_DIR ]]; then
+               		echo "Invalid input: option -s has already been used!" >&2
+               		exit 1                
+            	fi
 
-			if [[ -L "$OPTARG" ]]; then
-            	echo "-s $OPTARG is a symbolic link. Please enter a directory!" >&2
-            	exit 1
-			elif [[ -d "$OPTARG" ]]; then
-            	#wait on user input here (Y/N)
-            	#if user says Y set writing directory to that
-            	#if no then exit and ask for better input parameters
-            	echo "-s $OPTARG already exists. Continue writing in directory? (Y/N)" >&1
-            	read USER_INPUT
-            	while true;
-            	do
-                	if [[ "$USER_INPUT" == Y || "$USER_INPUT" == y ]]; then
-                    		echo "Using existing directory $OPTARG" >&1
-                    		break
-                	elif [[ "$USER_INPUT" == N || "$USER_INPUT" == n ]]; then
-                    		echo "Cancelled using save directory $OPTARG Program exiting." >&1
-                    		exit 0                            
-                	else
-                    		echo "Invalid input: $USER_INPUT !(Expected Y/N)" >&2
-                    		exit 1
-                	fi
-            	done
-            	SAVE_DIR="$OPTARG"
-            	#Remove previosu results from the existing save directory structure. If you rerun MC.sh with different flags it might not overwrite all the old results, so this cleanup is necessary for correct analysis later on
-            	find "$SAVE_DIR/" -name "Run_*" -exec rm -r -v "{}" +
-	    	else
-	        	#directory does not exist, set mkdir flag. Directory is made only when results are successfully collected.
-	        	SAVE_DIR="$OPTARG"
-	    	fi
-            ;;
+		if [[ -L "$OPTARG" ]]; then
+                 	echo "-s $OPTARG is a symbolic link. Please enter a directory!" >&2
+			exit 1
+		elif [[ -d "$OPTARG" ]]; then
+                    	#wait on user input here (Y/N)
+                    	#if user says Y set writing directory to that
+                    	#if no then exit and ask for better input parameters
+                    	echo "-s $OPTARG already exists. Continue writing in directory? (Y/N)" >&1
+                    	read USER_INPUT
+                    	while true;
+                    	do
+                        	if [[ "$USER_INPUT" == Y || "$USER_INPUT" == y ]]; then
+                            		echo "Using existing directory $OPTARG" >&1
+                            		break
+                        	elif [[ "$USER_INPUT" == N || "$USER_INPUT" == n ]]; then
+                            		echo "Cancelled using save directory $OPTARG Program exiting." >&1
+                            		exit 0                            
+                        	else
+                            		echo "Invalid input: $USER_INPUT !(Expected Y/N)" >&2
+                            		exit 1
+                        	fi
+                    	done
+                    	SAVE_DIR="$OPTARG"
+                    	#Remove previosu results from the existing save directory structure. If you rerun MC.sh with different flags it might not overwrite all the old results, so this cleanup is necessary for correct analysis later on
+                    	find "$SAVE_DIR/" -name "Run_*" -exec rm -r -v "{}" +
+            	else
+                	#directory does not exist, set mkdir flag. Directory is made only when results are successfully collected.
+                	SAVE_DIR="$OPTARG"
+            	fi
+            	;;
         #specify the benchmark executable to be ran
         x)
             if [[ -n $BENCH_EXEC ]]; then
