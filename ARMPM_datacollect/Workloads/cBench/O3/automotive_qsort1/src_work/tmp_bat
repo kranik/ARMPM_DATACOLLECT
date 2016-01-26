@@ -1,1 +1,0 @@
-time ./a.out ../../automotive_qsort_data/1.dat output.dat > ftmp_out
