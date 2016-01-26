@@ -20,7 +20,7 @@ endif
 # Actions
 all:		
 	$(ZCC) $(CCC_OPTS) $(CCC_OPTS_ADD) -c -DSASR -DSTUPID_COMPILER -DNeedFunctionPrototypes=1 *.c
-	$(LDCC) $(LD_OPTS) $(CCC_OPTS_ADD) -lm *.o
+	$(LDCC) $(LD_OPTS) $(CCC_OPTS_ADD) *.o -lm
 
 clean:
 	rm -f a.out *.o *.a *.s *.i *.I
