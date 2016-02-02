@@ -115,7 +115,6 @@ if [[ -z $RUNS ]]; then
 fi
 
 FREQ_LIST=$(ls $RESULTS_DIR/Run_${RUNS%% *} | tr " " "\n" | sort -gr | tr "\n" " ")
-
 	
 for i in $RUNS
 do
@@ -139,7 +138,7 @@ do
 		#for some obscure reason it cannot convert strings with \n to arrays so I need to extract identfiers then convers \n to commas using tr, then remove trailing last comma (which used to be a \n) and then convert properly
 		IFS="," read -a EVENTS_RAW <<< "$((awk -v START=$LABEL_START -v FINISH=$LABEL_FINISH -v COL=$RAW_COLUMN -v SEP='\t' 'BEGIN{FS=SEP}{if (NR >= START && NR < FINISH) {print $COL}}' < $EVENTS_RAW_FILE) | tr "\n" "," | head -c -1)" 
 
-	   	if [[ -z $SAVE ]]; then
+		if [[ -z $SAVE ]]; then
 	   		#Display results header
 			[[ -z $HEADER ]] && echo -e "#Timestamp\tFrequency\t$EVENTS_LABELS"; HEADER=1
 		else
@@ -151,6 +150,7 @@ do
 		#read lines for event timing skipping event_number lines since perf puts events even during the same timestamp on new lines. this essentially distinguishes the different timestamps
 		for linenum in $(seq $LABEL_FINISH ${#EVENTS_RAW[@]} $(wc -l $EVENTS_RAW_FILE | awk '{print $1}')) 
 		do
+			
 			#read timestamp
 			time=$(awk -v START=$linenum -v SEP=$col_sep 'BEGIN{FS = SEP}{if(NR==START){print $1;exit}}' < $EVENTS_RAW_FILE)
 			#get the events for the curent timestamp by going over jsut the nubmer of newlines as the total number of collected events
@@ -158,15 +158,17 @@ do
 			do
 				EVENTS_DATA_STORE+="$(awk -v START=$j -v SEP=$col_sep 'BEGIN{FS = SEP}{if(NR==START){print $2;exit}}' < $EVENTS_RAW_FILE)\t"
 			done
-		
-			#remove trailing tab character
-			EVENTS_DATA=$($EVENTS_DATA_STORE | head -c -1)
+			
+			#remove trailing tab character and any string end so remove last 3 characters
+			EVENTS_DATA=$(echo $EVENTS_DATA_STORE | head -c -3)
 			
 			#Convert time to nanoseconds to keep it consistent with how I take benchmark start and ent times. Get start time from the first line in the file in ns to convert to epoch time
 			starttime=$(awk -v START=$TIME_START -v SEP='\t' 'BEGIN{FS = SEP}{ if (NR == START){print $2; exit}}' $EVENTS_RAW_FILE)
-			nanotime=$(echo "scale = 0; ($starttime+($time*$time_convert))/1;" | bc )
 			
+			nanotime=$(echo "scale = 0; ($starttime+($time*$time_convert))/1;" | bc )
 			[[ -z $SAVE ]] && echo -e "$nanotime\t$FREQ_SELECT\t$EVENTS_DATA" || echo -e "$nanotime\t$EVENTS_DATA" >> $EVENTS_FILE
+			
+			EVENTS_DATA_STORE=""
 			EVENTS_DATA=""
 		done
 		

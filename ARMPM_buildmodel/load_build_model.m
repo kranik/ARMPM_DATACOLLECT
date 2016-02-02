@@ -153,19 +153,20 @@ function [] = load_build_model (freq_find,freq_next)
   ###########################################################
 
   fid = fopen ("/home/vokris/Work/ARMPM/ARMPM_buildmodel/test_set.data", "r");
-  test_set = dlmread(fid,'\t',1,3);
+  test_set = dlmread(fid,'\t',1,2);
   fclose (fid);
-
+  
+  
   #Coefficient computation
   for  idx = 1:size(test_set,1)
-    if test_set(idx,1) == freq_find
+    if test_set(idx,2) == freq_find
       break;
     endif
   endfor
   st=idx;
 
   for  idx = st:size(test_set,1)
-    if test_set(idx,1) == freq_next
+    if test_set(idx,2) == freq_next
       break;
     endif
   endfor
@@ -214,12 +215,12 @@ function [] = load_build_model (freq_find,freq_next)
   
   #mean(train_set(:,coeff_column))
   #mean(test_set(:,coeff_column))
-
-  test_power=test_set(st:nd,5);
+  
+  test_power=test_set(st:nd,6);
 %  pred_power=test_reg(st:nd,:)*m;
   
-  maxMP=max(test_power)
-  minMP=min(test_power)
+  maxMP=max(test_power);
+  minMP=min(test_power);
   
 %  maxMT=max(test_set(st:nd,4));
 %  minMT=min(test_set(st:nd,4));
@@ -238,20 +239,20 @@ function [] = load_build_model (freq_find,freq_next)
   disp("###########################################################");
   disp("Model validation against test set");
   disp("###########################################################");
-
-  disp(["Measured Power Range [%]: " num2str(100*(abs(maxMP-minMP)/abs(minMP)))]);  # Print Test Set power range
+  disp(["Avg. Totall Runtime [s]: " num2str( ( (nd-st) / max( test_set(st:nd,1) ) ) *0.5 ) ]);
+  disp(["Measured Power Range [%]: " num2str(100*(abs(maxMP-minMP)/abs(minMP)))]);
 %  disp(["Predicted Power Range [%]: " num2str(100*(abs(maxPP-minPP)/abs(minPP)))]);  # Print predicted power range. Should be close to measured power range
 
-  disp(["Average Power [W]: " num2str(mean(test_power))]);  # Print test Set average power
-  disp(["Average Temperature [C]: " num2str(mean(test_set(st:nd,2)))]);  # Print Test Set power range
-  disp(["Average Current [A]: " num2str(mean(test_set(st:nd,4)))]);  # Print Test Set power range
-  disp(["Voltage Level [A]: " num2str(mean(test_set(st:nd,3)))]);  # Print Test Set power range
-  disp(["Average Ev1 [#]: " num2str(mean(test_set(st:nd,7)))]);  # Print Test Set power range
-  disp(["Average Ev2 [#]: " num2str(mean(test_set(st:nd,8)))]);  # Print Test Set power range
-  disp(["Average Ev3 [#]: " num2str(mean(test_set(st:nd,9)))]);  # Print Test Set power range
-  disp(["Average Ev4 [#]: " num2str(mean(test_set(st:nd,10)))]);  # Print Test Set power range
-  disp(["Average Ev5 [#]: " num2str(mean(test_set(st:nd,11)))]);  # Print Test Set power range
-  
+  disp(["Avg. Power [W]: " num2str(mean(test_power))]);  
+  disp(["Avg. Temperature [C]: " num2str(mean(test_set(st:nd,3)))]);  
+  disp(["Avg. Voltage [V]: " num2str(mean(test_set(st:nd,4)))]); 
+  disp(["Avg. Current [A]: " num2str(mean(test_set(st:nd,5)))]);  
+  disp(["Avg. Totall Ev1 [#]: " num2str(sum(test_set(st:nd,7))/max(test_set(st:nd,1)))]);  
+  disp(["Avg. Totall Ev2 [#]: " num2str(sum(test_set(st:nd,8))/max(test_set(st:nd,1)))]);  
+  disp(["Avg. Totall Ev3 [#]: " num2str(sum(test_set(st:nd,9))/max(test_set(st:nd,1)))]);  
+  disp(["Avg. Totall Ev4 [#]: " num2str(sum(test_set(st:nd,10))/max(test_set(st:nd,1)))]);
+  disp(["Avg. Totall Ev5 [#]: " num2str(sum(test_set(st:nd,11))/max(test_set(st:nd,1)))]);
+
 %  disp(["Average Error [%]: " num2str(average_err*100)]);  # Print average model error. Should be close to 0.
 %  disp(["Standart Deviation Error [%]: " num2str(std_dev_err*100)]);  # Print standart deviation of model error. The lower the better.
 %  disp(["Normalised RMS Error [%]: " num2str(norm_rms_err*100)]);  # Print average model RMS error

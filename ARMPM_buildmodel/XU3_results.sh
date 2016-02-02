@@ -55,7 +55,7 @@ do
             fi
             ;;
                         
-        #Specify the save directory, if no save directory is chosen the results are saved in the $PWD
+        #Specify the save file, if no save directory is chosen the results are printed on terminal
         s)
         	if [[ -n $SAVE_FILE ]]; then
             	echo "Invalid input: option -s has already been used!" >&2
@@ -102,7 +102,6 @@ do
 
 			spaced_OPTARG="${OPTARG//,/ }"
 			
-#!!!!! MAKE SURE NUM_RUNS IS NOT NULL (RESULTS DIR HAS BEEN SPECIFIED ALREADY)
 
 			#Go throught the selected frequecnies and make sure they are not out of bounds
 			#Also make sure they are present in the frequency table located at /sys/devices/system/cpu/cpufreq/iks-cpufreq/freq_table because the kernel rounds up
@@ -141,7 +140,7 @@ fi
 						
 FREQ_LIST=$(ls $RESULTS_DIR/Run_${RUNS%% *} | tr " " "\n" | sort -gr | tr "\n" " ")						
 
-#./process_raw_events.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
+./process_raw_events.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
 ./concatenate_results.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
 
 #Go into results directories and concatenate all the results files in to a big beast!
@@ -159,7 +158,7 @@ do
 	
 		if [[ -z $SAVE_FILE ]]; then
 			#Display results header
-			[[ -z $HEADER ]] && echo -e "$TIME_BENCH_HEADER\tRun(#)\t$SENSORS_EVENTS_HEADER"; HEADER=1
+			[[ -z $HEADER ]] && echo -e "$TIME_BENCH_HEADER\tRun(#)\t$SENSORS_EVENTS_HEADER" >&1; HEADER=1
 		else
 		   	#Save results header
 			[[ -z $HEADER ]] && echo -e "$TIME_BENCH_HEADER\tRun(#)\t$SENSORS_EVENTS_HEADER" > $SAVE_FILE; HEADER=1
@@ -169,7 +168,7 @@ do
 		do
 			TIME_BENCH_DATA=$((awk -v SEP='\t' -v START=$LINE -v COL_END=$(($BENCHMARK_NAME_COLUMN+1)) 'BEGIN{FS=SEP}{if(NR==START){ for(i=1;i<COL_END;i++) print $i} }' < $RESULTS_FILE) | tr "\n" "\t" | head -c -1)
 			SENSORS_EVENTS_DATA=$(((awk -v SEP='\t' -v START=$LINE -v COL_START=$(($BENCHMARK_NAME_COLUMN+1)) 'BEGIN{FS=SEP}{if(NR==START){ for(i=COL_START;i<=NF;i++) print $i} }' < $RESULTS_FILE) | tr "\n" "\t" | head -c -1) | head -c -1) 
-			[[ -z $SAVE_FILE ]] && echo -e "$TIME_BENCH_DATA\t$i\t$SENSORS_EVENTS_DATA" || echo -e "$TIME_BENCH_DATA\t$i\t$SENSORS_EVENTS_DATA" >> $SAVE_FILE		 
+			[[ -z $SAVE_FILE ]] && echo -e "$TIME_BENCH_DATA\t$i\t$SENSORS_EVENTS_DATA" >&1 || echo -e "$TIME_BENCH_DATA\t$i\t$SENSORS_EVENTS_DATA" >> $SAVE_FILE		 
 		done
 	done
 done
