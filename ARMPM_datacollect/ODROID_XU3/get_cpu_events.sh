@@ -148,7 +148,7 @@ do
 	echo -e "Event $(( $i+1 )) Label:\t${EVENTS_LABELS[$i]}\t\tRAW Identifier:\t${EVENTS_RAW[$i]}" >&2
 done
 
-#u./perf stat -e cycles,instructions,cache-references,cache-misses -x "\t" -o "del.tmp" __run $j > /dev/null 2> /dev/null
 [[ -z $BENCH_SAVE ]] && BENCH_SAVE=/dev/stdout
 ./perf stat -g --cpu $CORE_RUN -e $EVENTS_LIST -I $SAMPLE_TIME -x "\t" $BENCH_EXEC > $BENCH_SAVE #2> /dev/null
-
+#execute perf that follows the thread this is to provide me with a base scenario
+#./perf stat -g -e $EVENTS_LIST -I $SAMPLE_TIME -x "\t" $BENCH_EXEC > $BENCH_SAVE #2> /dev/null

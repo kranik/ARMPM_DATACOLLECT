@@ -27,34 +27,34 @@ do
             ;;
         b|L)
             #Make sure command has not already been processed (flag is unset)
-			if [[ -n $CORE_CHOSEN ]]; then
-				echo "Invalid input: option -b or -L has already been used!" >&2
-				exit 1
-			fi
-		            
-			if ! [[ "$OPTARG" =~ ^[1-4]$ ]]; then
-				echo "Invalid input: $OPTARG needs to be 1-4 (number of cores)!" >&2
-				exit 1
-			fi
+            	if [[ -n $CORE_CHOSEN ]]; then
+                	echo "Invalid input: option -b or -L has already been used!" >&2
+                	exit 1
+		fi
+                
+		if ! [[ "$OPTARG" =~ ^[1-4]$ ]]; then
+                	echo "Invalid input: $OPTARG needs to be 1-4 (number of cores)!" >&2
+			exit 1
+		fi
 
-			if [[ $opt == b ]]; then
-				MAX_CORE=7
-				MIN_CORE=4
-				CORE_COLLECT_FREQ=1400000
-		        MAX_F=2000000
-				MIN_F=200000
-			else
-				MAX_CORE=3
-				MIN_CORE=0
-				CORE_COLLECT_FREQ=2000000
-				MAX_F=1400000
-				MIN_F=200000
-			fi
-		           	
-			CORE_CHOSEN="$OPTARG"
-			;;
+		if [[ $opt == b ]]; then
+			MAX_CORE=7
+			MIN_CORE=4
+			CORE_COLLECT_FREQ=1400000
+               		MAX_F=2000000
+             		MIN_F=200000
+               	else
+			MAX_CORE=3
+			MIN_CORE=0
+			CORE_COLLECT_FREQ=2000000
+               		MAX_F=1400000
+               		MIN_F=200000
+              	fi
+               	
+		CORE_CHOSEN="$OPTARG"
+		;;
 
-		f)
+	f)
                 if [[ -n $CORE_FREQ ]]; then
                         echo "Invalid input: option -f has already been used!" >&2
                         exit 1
@@ -78,41 +78,41 @@ do
 
         #Specify the save directory, if no save directory is chosen the results are saved in the $PWD
         s)
-        	if [[ -n $SAVE_DIR ]]; then
-            	echo "Invalid input: option -s has already been used!" >&2
-            	exit 1                
-        	fi
+		if [[ -n $SAVE_DIR ]]; then
+               		echo "Invalid input: option -s has already been used!" >&2
+               		exit 1                
+            	fi
 
-			if [[ -L "$OPTARG" ]]; then
-            	echo "-s $OPTARG is a symbolic link. Please enter a directory!" >&2
-            	exit 1
-			elif [[ -d "$OPTARG" ]]; then
-            	#wait on user input here (Y/N)
-            	#if user says Y set writing directory to that
-            	#if no then exit and ask for better input parameters
-            	echo "-s $OPTARG already exists. Continue writing in directory? (Y/N)" >&1
-            	read USER_INPUT
-            	while true;
-            	do
-                	if [[ "$USER_INPUT" == Y || "$USER_INPUT" == y ]]; then
-                    		echo "Using existing directory $OPTARG" >&1
-                    		break
-                	elif [[ "$USER_INPUT" == N || "$USER_INPUT" == n ]]; then
-                    		echo "Cancelled using save directory $OPTARG Program exiting." >&1
-                    		exit 0                            
-                	else
-                    		echo "Invalid input: $USER_INPUT !(Expected Y/N)" >&2
-                    		exit 1
-                	fi
-            	done
-            	SAVE_DIR="$OPTARG"
-            	#Remove previosu results from the existing save directory structure. If you rerun MC.sh with different flags it might not overwrite all the old results, so this cleanup is necessary for correct analysis later on
-            	find "$SAVE_DIR/" -name "Run_*" -exec rm -r -v "{}" +
-	    	else
-	        	#directory does not exist, set mkdir flag. Directory is made only when results are successfully collected.
-	        	SAVE_DIR="$OPTARG"
-	    	fi
-            ;;
+		if [[ -L "$OPTARG" ]]; then
+                 	echo "-s $OPTARG is a symbolic link. Please enter a directory!" >&2
+			exit 1
+		elif [[ -d "$OPTARG" ]]; then
+                    	#wait on user input here (Y/N)
+                    	#if user says Y set writing directory to that
+                    	#if no then exit and ask for better input parameters
+                    	echo "-s $OPTARG already exists. Continue writing in directory? (Y/N)" >&1
+                    	read USER_INPUT
+                    	while true;
+                    	do
+                        	if [[ "$USER_INPUT" == Y || "$USER_INPUT" == y ]]; then
+                            		echo "Using existing directory $OPTARG" >&1
+                            		break
+                        	elif [[ "$USER_INPUT" == N || "$USER_INPUT" == n ]]; then
+                            		echo "Cancelled using save directory $OPTARG Program exiting." >&1
+                            		exit 0                            
+                        	else
+                            		echo "Invalid input: $USER_INPUT !(Expected Y/N)" >&2
+                            		exit 1
+                        	fi
+                    	done
+                    	SAVE_DIR="$OPTARG"
+                    	#Remove previosu results from the existing save directory structure. If you rerun MC.sh with different flags it might not overwrite all the old results, so this cleanup is necessary for correct analysis later on
+                    	find "$SAVE_DIR/" -name "Run_*" -exec rm -r -v "{}" +
+            	else
+                	#directory does not exist, set mkdir flag. Directory is made only when results are successfully collected.
+                	SAVE_DIR="$OPTARG"
+            	fi
+            	;;
         #specify the benchmark executable to be ran
         x)
             if [[ -n $BENCH_EXEC ]]; then
@@ -222,8 +222,16 @@ do
 		if [[ -z "$CORE_RUN" ]]; then 
 			CORE_RUN="${COREs[$i]}"
 		else
-			[[ $(( `echo $CORE_RUN | tr -cd ',' | wc -c` + 1 )) < $CORE_CHOSEN ]] && CORE_RUN+=",${COREs[$i]}" || echo 0 > "/sys/devices/system/cpu/cpu${COREs[$i]}/online"
-		fi
+			#due to a bug in cpuset need to set the shield before I turn cores offline, hence not doing it here bit sumply storing them in an array
+			#I store hotplug core names with commas to keep it consistent even though I can just iterate through the list better with spaces in the array
+			if [[ $(( `echo $CORE_RUN | tr -cd ',' | wc -c` + 1 )) < $CORE_CHOSEN ]]; then
+				CORE_RUN+=",${COREs[$i]}"
+			elif [[ -z "$CORE_HOTPLUG" ]]; then
+                        	CORE_HOTPLUG="${COREs[$i]}"
+			else
+				CORE_HOTPLUG+=",${COREs[$i]}"
+			fi
+		fi	
 	else
                 if [[ -z "$CORE_COLLECT" ]]; then 
                         CORE_COLLECT="${COREs[$i]}"
@@ -233,13 +241,18 @@ do
 	fi
 done
 
+
 if [[ $(( `echo $CORE_RUN | tr -cd ',' | wc -c` + 1 )) < $CORE_CHOSEN ]]; then
 	echo -e "Selected number of run COREs more than what the environment provides. Please check total number of enabled COREs on the system." >&2
 	exit 1
+else
+	echo "core_run = "$CORE_RUN
+	cset shield -c $CORE_RUN -k on --force
 fi
 
+
 if [[ -z "$CORE_COLLECT" ]]; then
-	echo -e "The system does not have any COREs left to collect results. This can result in unwanted overhead and skep the power consumption of the monitored run COREs. Continue with execution? (Y/N)" >&1
+	echo -e "The system does not have any COREs left to collect results. This can result in unwanted overhead and skew the power consumption of the monitored run COREs. Continue with execution? (Y/N)" >&1
 	read USER_INPUT
 	while true;
 	do
@@ -256,8 +269,16 @@ if [[ -z "$CORE_COLLECT" ]]; then
 	done
 fi
 
+echo "core_hotplug = "$CORE_HOTPLUG
+#Turning off unwanted cores to enable directed cluster sensor readings
+for i in ${CORE_HOTPLUG//,/ }
+do
+	echo 0 > "/sys/devices/system/cpu/cpu$i/online"
+done
+
 echo "Sanity check."
 cpufreq-info
+cset shield
 
 #Run benchmarks for specified number of runs
 for i in `seq 1 $NUM_RUNS`;
@@ -269,21 +290,21 @@ do
 		echo "Core frequency: $FREQ_SELECT""Mhz" 
 		
 		#Run collections scripts in parallel to the benchmarks
-		
-		taskset -c $CORE_COLLECT ./sensors 1 1  $SAMPLE_NS > "sensors.data" &
+		./sensors 1 1 $SAMPLE_NS > "sensors.data" &
 		PID_sensors=$!
 		disown
+		
 		#Run collections scripts in parallel to the benchmarks
-		taskset -c $CORE_COLLECT ./get_cpu_usage.sh -c $CORE_RUN -t $SAMPLE_NS > "usage.data" &
-		PID_usage=$!
-		disown
+		#taskset -c $CORE_COLLECT ./get_cpu_usage.sh -c $CORE_RUN -t $SAMPLE_NS > "usage.data" &
+		#PID_usage=$!
+		#disown
 
-		taskset -c $CORE_COLLECT ./get_cpu_events.sh -c $CORE_RUN -s "benchmarks.data" -x $BENCH_EXEC -e $EVENTS_LIST_FILE -t $SAMPLE_MS 2> "events_raw.data" 
+		./get_cpu_events.sh -c $CORE_RUN -s "benchmarks.data" -x $BENCH_EXEC -e $EVENTS_LIST_FILE -t $SAMPLE_MS 2> "events_raw.data" 
 
 		#after benchmarks have run kill sensor collect and smartpower (if chosen)
 		sleep 1
 		kill $PID_sensors > /dev/null
-		kill $PID_usage > /dev/null
+		#kill $PID_usage > /dev/null
 		sleep 1
                 echo "Data collection completed successfully"
 
@@ -291,23 +312,28 @@ do
 		if [[ -n $SAVE_DIR ]]; then
 			mkdir -v -p "$SAVE_DIR/Run_$i/$FREQ_SELECT"
 			echo "Copying results to chosen dir: $SAVE_DIR/Run_$i/$FREQ_SELECT"
-			cp -v "sensors.data" "usage.data" "benchmarks.data" "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"
-			rm -v "sensors.data" "usage.data" "benchmarks.data" "events_raw.data"
+			cp -v "sensors.data" "benchmarks.data" "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"
+			rm -v "sensors.data" "benchmarks.data" "events_raw.data"
 		else
 			mkdir -v -p "Run_$i/$FREQ_SELECT"
 			echo "Copying results to dir: Run_$i/$FREQ_SELECT"
-			cp -v "sensors.data" "usage.data" "benchmarks.data" "events_raw.data" "Run_$i/$FREQ_SELECT"
-			rm -v "sensors.data" "usage.data" "benchmarks.data" "events_raw.data"
+			cp -v "sensors.data" "benchmarks.data" "events_raw.data" "Run_$i/$FREQ_SELECT"
+			rm -v "sensors.data" "benchmarks.data" "events_raw.data"
 		fi
 	done
 done
-echo "Returning environment to previosu state"
+echo "Returning environment to previous state"
 for i in `seq 0 7`
 do
 	echo 1 > "/sys/devices/system/cpu/cpu$i/online"
 done
 cpufreq-set -d 2000000 -u 2000000 -c 4
 cpufreq-set -d 1400000 -u 1400000 -c 0
+cset shield --reset
+
 echo "Sanity check."
 cpufreq-info
+cset shield
+
 echo "Script End! :)"
+exit
