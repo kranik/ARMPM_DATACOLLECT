@@ -140,8 +140,6 @@ fi
 						
 FREQ_LIST=$(ls $RESULTS_DIR/Run_${RUNS%% *} | tr " " "\n" | sort -gr | tr "\n" " ")						
 
-echo $RUNS
-
 ./process_raw_events.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
 ./concatenate_results.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
 
