@@ -1,8 +1,8 @@
 function [] = load_build_model (freq_find,freq_next)
-#blabla
-  fid = fopen ("/home/vokris/Work/ARM_PowerModel/BuildModel/train_set.data", "r");
-  train_set = dlmread(fid,'\t',1,1);
-  fclose (fid);
+
+fid = fopen ("/home/vokris/Work/ARMPM/ARMPM_buildmodel/train_set.data", "r");
+train_set = dlmread(fid,'\t',0,3);
+fclose (fid);
 
   ###########################################################
   # Step 2: Invoke build_model on a and Y to calculate model
@@ -15,19 +15,28 @@ function [] = load_build_model (freq_find,freq_next)
 %  IPC_train=train_set(:,9)./train_set(:,5);
 %  train_reg=[ones(size(train_set,1),1),IPC_train];
 
-%  coeff_column=12;
+%coeff_column=10;
 %%  
-%  train_reg=[ones(size(train_set,1),1),train_set(:,coeff_column)];
+%train_reg=[ones(size(train_set,1),1),train_set(:,coeff_column)];
   
   
   #MYMODEL
-%  train_reg=[ones(size(train_set,1),1),train_set(:,2),train_set(:,3),train_set(:,4)]; #justphysical
-%  train_reg=[ones(size(train_set,1),1),train_set(:,5:9)]; #justevents
-%  train_reg=[ones(size(train_set,1),1),train_set(:,10:15)]; #justCPUstate
-  
-%  train_reg=[ones(size(train_set,1),1),train_set(:,2),train_set(:,3),train_set(:,4),train_set(:,5:9)]; #physical + PMU events
+%train_reg=[ones(size(train_set,1),1),train_set(:,1).*(train_set(:,3).^2)];
 
-  train_reg=[ones(size(train_set,1),1),train_set(:,2),train_set(:,3),train_set(:,4),train_set(:,5:9),train_set(:,10:15)]; #final
+%train_reg=[ones(size(train_set,1),1),train_set(:,2)]; #justphysical temperature
+
+%train_reg=[ones(size(train_set,1),1),train_set(:,6:10)]; #justevents
+%  train_reg=[ones(size(train_set,1),1),train_set(:,10:15)]; #justCPUstate
+
+%train_reg=[ones(size(train_set,1),1),train_set(:,1).*(train_set(:,3).^2)]; #physical allfreq
+%train_reg=[ones(size(train_set,1),1),train_set(:,1).*(train_set(:,3).^2),train_set(:,2),train_set(:,6:10)]; #physical + PMU events allfreq 
+  %train_reg=[(0.000585968 * ( train_set(:,1).*(train_set(:,3).^2) ) ),train_set(:,2),train_set(:,6:10)]; #physical + PMU events
+
+train_reg=[ones(size(train_set,1),1),train_set(:,2),train_set(:,6:10)]; #physical + PMU events
+  
+%train_reg=[ones(size(train_set,1),1),train_set(:,1).*train_set(:,2).*train_set(:,3),train_set(:,6:10)]; #physical + PMU events
+
+%train_reg=[ones(size(train_set,1),1),train_set(:,[2,3,4,5:9,10:15]); #final
 
   #CSR MODEL
 %  int_train_reg=train_set(:,7)./train_set(:,6);
@@ -54,43 +63,44 @@ function [] = load_build_model (freq_find,freq_next)
 %  train_reg=[ones(size(train_set,1),1),train_set(:,3),train_set(:,3).^2];
 %
 
+format long E
 
-  [m, Err, CLow, CHigh] = build_model(train_reg,train_set(:,1));
+disp("###########################################################");
+%[m, Err, CLow, CHigh] = build_model(train_reg,( train_set(:,5) .- (0.000381512 .* ( train_set(:,1).*(train_set(:,3).^2) ) ) ) );
+[m, Err, CLow, CHigh] = build_model(train_reg,train_set(:,5));
 
   ###########################################################
   # Step 3: Inspect and evaluata model quality
   ###########################################################
+  
+disp("###########################################################");
+# Print model coefficients
+disp(["Model coefficients: " num2str(m',"%G\t")]);
 
-  format
+%disp("Model quality measures:");
 
-  disp("###########################################################");
-  disp("Model coefficients:");    # Print model coefficients
-  disp(["Coeff: " num2str(m')]);
+%mean_Error  = mean(Err);
+%disp("  Average model error [%]:");     # Print average model error
+%disp(["    "  num2str(mean_Error*100)]); # This should be very close to 0
+%disp("");
 
-  %disp("Model quality measures:");
+%std_Error   = std(Err);
+%disp("  Standard deviation of model error [%]:");   # Print std of model error
+%disp(["    "  num2str(std_Error*100)]);              # The lower the beter
+%disp("");
 
-  mean_Error  = mean(Err);
-  %disp("  Average model error [%]:");     # Print average model error
-  %disp(["    "  num2str(mean_Error*100)]); # This should be very close to 0
-  %disp("");
-
-  std_Error   = std(Err);
-  %disp("  Standard deviation of model error [%]:");   # Print std of model error
-  %disp(["    "  num2str(std_Error*100)]);              # The lower the beter
-  %disp("");
-
-  %disp("  Width of confidence intervals [% of model coefficient]");
-  %disp(["    "  num2str(((CHigh-CLow)./m*100)')]);    # The lower the beter
-  %disp("");                                           # Good if all numbers are the same order
-  %
-  %if (any((CHigh-CLow)./m > 0.05))
-  %    disp("Warning: Confidence itnerval wider than 5%");
-  %endif
+%disp("  Width of confidence intervals [% of model coefficient]");
+%disp(["    "  num2str(((CHigh-CLow)./m*100)')]);    # The lower the beter
+%disp("");                                           # Good if all numbers are the same order
+%
+%if (any((CHigh-CLow)./m > 0.05))
+%    disp("Warning: Confidence itnerval wider than 5%");
+%endif
 
 
 
 
-  skew_Error = skewness(Err);
+%  skew_Error = skewness(Err);
   %disp("  Skewness:");                        # Skweness = 0 means symmetric distribution
   %disp(["    "  num2str(skew_Error)]);    #
   %disp("");
@@ -99,7 +109,7 @@ function [] = load_build_model (freq_find,freq_next)
   %    disp("Warning: Error distribution seems to be skewed");
   %endif
 
-  kurt_Error = kurtosis(Err);
+%  kurt_Error = kurtosis(Err);
   %disp("  Kurtosis:");                        # Kurtosis = 0 for normal distributin, >0 for more "pointy"/"peaked" distributions
   %disp(["    "  num2str(kurt_Error)]);    # and < 0 for more "short"/"wide" distributions (compared to normal distribution)
   %disp("");
@@ -148,32 +158,34 @@ function [] = load_build_model (freq_find,freq_next)
   #errorbar(1:3,ones(1,3),el,eh)
   #axis([1 3 0.9 1.1])
 
-  ###########################################################
-  # Step 3: Additional validity for test set
-  ###########################################################
+    ###########################################################
+    # Step 3: Additional validity for test set
+    ###########################################################
+    
+fid = fopen ("/home/vokris/Work/ARMPM/ARMPM_buildmodel/test_set.data", "r");
+test_set = dlmread(fid,'\t',0,2);
+fclose (fid);
 
-  fid = fopen ("/home/vokris/Work/ARM_PowerModel/BuildModel/test_set.data", "r");
-  test_set = dlmread(fid,'\t',1,1);
-  fclose (fid);
 
-  #Coefficient computation
+#Coefficient computation
+for  idx = 1:size(test_set,1)
+if test_set(idx,2) == freq_find
+  break;
+endif
+endfor
+st=idx;
 
-  for  idx = 1:size(test_set,1)
-    if test_set(idx,3) == freq_find
-      break;
-    endif
-  endfor
-  st=idx;
+for  idx = st:size(test_set,1)
+if test_set(idx,2) == freq_next
+  break;
+endif
+endfor
+nd=idx-1;
 
-  for  idx = st:size(test_set,1)
-    if test_set(idx,3) == freq_next
-      break;
-    endif
-  endfor
-  nd=idx-1;
 
-  
-%  test_reg=[ones(size(test_set,1),1),test_set(:,coeff_column)];
+
+
+%test_reg=[ones(size(test_set,1),1),test_set(:,coeff_column+1)];
   
 %  CPI_test=test_set(:,5)./test_set(:,9);
 %  IPC_test=test_set(:,9)./test_set(:,5);
@@ -181,13 +193,21 @@ function [] = load_build_model (freq_find,freq_next)
 %  test_reg=[ones(size(test_set,1),1),IPC_test];
 
   #MYMODEL
-%  test_reg=[ones(size(test_set,1),1),test_set(:,2),test_set(:,3),test_set(:,4)]; #JUSTPHYSICAL
-%  test_reg=[ones(size(test_set,1),1),test_set(:,5:9)]; #JUSTEVENTS
+%test_reg=[ones(size(test_set,1),1),test_set(:,2).*(test_set(:,4).^2)]; 
+%test_reg=[ones(size(test_set,1),1),test_set(:,3)]; #JUSTPHYSICAL temperature
+%test_reg=[ones(size(test_set,1),1),test_set(:,7:11)]; #JUSTEVENTS
 %  test_reg=[ones(size(test_set,1),1),test_set(:,10:15)]; #JUSTCPUSTATE
-  
-%  test_reg=[ones(size(test_set,1),1),test_set(:,2),test_set(:,3),test_set(:,4),test_set(:,5:9)]; #physical + PMU
+
+%test_reg=[ones(size(test_set,1),1),test_set(:,2).*(test_set(:,4).^2)]; #physical allfreq
+%test_reg=[ones(size(test_set,1),1),test_set(:,2).*(test_set(:,4).^2),test_set(:,3),test_set(:,7:11)]; #physical + PMU allfreq
+
+%test_reg=[(0.000585968 * ( test_set(:,2).*(test_set(:,4).^2) ) ),test_set(:,3),test_set(:,7:11)];
+
+test_reg=[ones(size(test_set,1),1),test_set(:,3),test_set(:,7:11)];
+
+%test_reg=[ones(size(test_set,1),1),test_set(:,2).*test_set(:,3).*test_set(:,4),test_set(:,7:11)]; #physical + PMU
 %
-  test_reg=[ones(size(test_set,1),1),test_set(:,2),test_set(:,3),test_set(:,4),test_set(:,5:9),test_set(:,10:15)]; #full
+%  test_reg=[ones(size(test_set,1),1),test_set(:,4:7)]; #full
     
   
   #CSR MODEL
@@ -215,52 +235,64 @@ function [] = load_build_model (freq_find,freq_next)
   
   #mean(train_set(:,coeff_column))
   #mean(test_set(:,coeff_column))
-  
 
-  test_power=test_set(st:nd,1);
-  pred_power=test_reg(st:nd,:)*m;
-  
-  maxMP=max(test_power)
-  minMP=min(test_power)
-  
-  maxMT=max(test_set(st:nd,4));
-  minMT=min(test_set(st:nd,4));
-  
-  maxPP=max(pred_power);
-  minPP=min(pred_power);
-  
-  error=(abs(pred_power-test_power))./abs(test_power);
-  average_err=mean(error);
-  std_dev_err=std(error);
-  
-  ms_err=mean((pred_power-test_power).^2);
-  rms_err=sqrt(ms_err);
-  norm_rms_err=rms_err/mean(test_power);
-  
+avg_runtime=( (nd-st) / max( test_set(st:nd,1) ) ) *0.5;
+%for idx = 1:max(test_set(st:nd,1))
+%    i = find(test_set(st:nd,1)==idx);
+%    #difference is calculated by taking runtime of run divided by average runtime
+%    runtime= (max(i) - min(i)) * 0.5;
+%    run_diff(idx) = 100* ( abs(runtime-avg_runtime) / ((runtime+avg_runtime)/2) );
+%endfor
+ 
+test_power=test_set(st:nd,6);
+avg_power=mean(test_power);
+for idx = 1:max(test_set(st:nd,1))
+    i = find(test_set(st:nd,1)==idx);
+    #difference is calculated by taking runtime of run divided by average runtime
+    power_run=mean(test_power(min(i):max(i)));
+    power_diff(idx) = 100* ( abs(power_run-avg_power) / ((power_run+avg_power)/2) );
+endfor
 
-  disp("###########################################################");
-  disp("Model validation against test set");
-  disp("###########################################################");
 
-  disp(["Measured Power Range [%]: " num2str(100*(abs(maxMP-minMP)/abs(minMP)))]);  # Print Test Set power range
-  disp(["Predicted Power Range [%]: " num2str(100*(abs(maxPP-minPP)/abs(minPP)))]);  # Print predicted power range. Should be close to measured power range
+pred_power=(test_reg(st:nd,:)*m);
+%pred_power=((test_reg(st:nd,:)*m).+(0.000381512 .* (test_set(st:nd,2).*(test_set(st:nd,4).^2))));
+
+
   
-  disp(["Average Power [W]: " num2str(mean(test_power))]);  # Print test Set average power
-  disp(["Average Temperature [C]: " num2str(mean(test_set(st:nd,4)))]);  # Print Test Set power range
+maxMP=max(test_power);
+minMP=min(test_power);
+
+maxPP=max(pred_power);
+minPP=min(pred_power);
+
+error=(abs(pred_power-test_power))./abs(test_power);
+average_err=mean(error);
+std_dev_err=std(error);
   
-  disp(["Average Error [%]: " num2str(average_err*100)]);  # Print average model error. Should be close to 0.
-  disp(["Standart Deviation Error [%]: " num2str(std_dev_err*100)]);  # Print standart deviation of model error. The lower the better.
-  disp(["Normalised RMS Error [%]: " num2str(norm_rms_err*100)]);  # Print average model RMS error
-  
-  disp("###########################################################");
-  disp("One line");
-  disp("###########################################################");
-  disp([num2str(100*(abs(maxMP-minMP)/abs(minMP))) " " num2str(100*(abs(maxPP-minPP)/abs(minPP))) " " num2str(average_err*100) " " num2str(std_dev_err*100) " " num2str(norm_rms_err*100)]);
-  
-  #Extra stuff
-%  disp("###########################################################");
-%  disp("Display values\n");
-%  disp("###########################################################");
-%  disp([repmat("Frequency: " , [size(test_set(st:nd,3),1),1]) num2str(test_set(st:nd,3))]);
-%  disp([repmat("Measured: " , [size(test_set(st:nd,3),1),1]) num2str(test_power(st:nd,:))]);
-%  disp([repmat("Predicted: " , [size(test_set(st:nd,3),1),1]) num2str(pred_power(st:nd,:))]);
+ms_err=mean((pred_power-test_power).^2);
+rms_err=sqrt(ms_err);
+norm_rms_err=rms_err/mean(test_power);
+
+disp("###########################################################");
+disp("Model validation against test set");
+disp("###########################################################");
+disp(["Avg. Total Runtime [s]: " num2str(avg_runtime) ]);
+%disp(["Runtime Diff. [%]: " num2str(run_diff,"%G\t") ]);
+disp(["Avg. Power [W]: " num2str(avg_power)]); 
+disp(["Power Diff. [W]: " num2str(power_diff,"%G\t")]); 
+disp(["Measured Power Range [%]: " num2str(100*(abs(maxMP-minMP)/abs(minMP)))]);
+disp("###########################################################"); 
+disp(["Avg. Pred. Power [W]: " num2str(mean(pred_power))]);  
+disp(["Pred. Power Range [%]: " num2str(100*(abs(maxPP-minPP)/abs(minPP)))]);  # Print predicted power range. Should be close to measured power range
+disp(["Avg. Error [%]: " num2str(average_err*100)]);  # Print average model error. Should be close to 0.
+disp(["Std. Dev. Error [%]: " num2str(std_dev_err*100)]);  # Print standart deviation of model error. The lower the better.
+disp(["Norm. RMS Error [%]: " num2str(norm_rms_err*100)]);  # Print average model RMS error
+disp("###########################################################");
+disp(["Avg. Temperature [C]: " num2str(mean(test_set(st:nd,3)))]);  
+disp(["Avg. Voltage [V]: " num2str(mean(test_set(st:nd,4)))]); 
+disp(["Avg. Current [A]: " num2str(mean(test_set(st:nd,5)))]);  
+disp(["Avg. Total Ev1 [#]: " num2str(sum(test_set(st:nd,7))/max(test_set(st:nd,1)))]);  
+disp(["Avg. Total Ev2 [#]: " num2str(sum(test_set(st:nd,8))/max(test_set(st:nd,1)))]);  
+disp(["Avg. Total Ev3 [#]: " num2str(sum(test_set(st:nd,9))/max(test_set(st:nd,1)))]);  
+disp(["Avg. Total Ev4 [#]: " num2str(sum(test_set(st:nd,10))/max(test_set(st:nd,1)))]);
+disp(["Avg. Total Ev5 [#]: " num2str(sum(test_set(st:nd,11))/max(test_set(st:nd,1)))]);

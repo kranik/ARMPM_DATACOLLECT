@@ -28,8 +28,8 @@ function [m, Err, CLow, CHigh] = build_model(X,Y)
     for ii = 1:size(combination_indices,1)
         if (std(X(:,combination_indices(ii,1))) != 0 && std(X(:,combination_indices(ii,2))) != 0)  # chech that columns are not constant
             cc = corrcoef(X(:,combination_indices(ii,1)),X(:,combination_indices(ii,2)));   # calculate correlation coefficient
-            if (abs(cc) > 0.3)
-                disp(["Warning: correlation between activity measures " mat2str(combination_indices(ii,:)) " is" num2str(cc)]);
+            if (abs(cc) > 0.0)
+                disp(["Warning: correlation between activity measures " mat2str(combination_indices(ii,:)) " is " num2str(cc)]);
             endif
         endif
     endfor
