@@ -155,39 +155,38 @@ do
                 fi 	            	
         	fi
             ;;
-          
-        #Specify the save file, if no save directory is chosen the results are printed on terminal
-        s)
-        	if [[ -n $SAVE_FILE ]]; then
-            	echo "Invalid input: option -s has already been used!" >&2
-            	exit 1                
-        	fi
+		#Specify the save file, if no save directory is chosen the results are printed on terminal
+		s)
+			if [[ -n $SAVE_FILE ]]; then
+			    	echo "Invalid input: option -s has already been used!" >&2
+			    	exit 1                
+			fi
 
 			if [[ -e "$OPTARG" ]]; then
-            	#wait on user input here (Y/N)
-            	#if user says Y set writing directory to that
-            	#if no then exit and ask for better input parameters
-            	echo "-s $OPTARG already exists. Continue writing in file? (Y/N)" >&1
-            	read USER_INPUT
-            	while true;
-            	do
-                	if [[ "$USER_INPUT" == Y || "$USER_INPUT" == y ]]; then
-                    		echo "Using existing file $OPTARG" >&1
-                    		break
-                	elif [[ "$USER_INPUT" == N || "$USER_INPUT" == n ]]; then
-                    		echo "Cancelled using save file $OPTARG Program exiting." >&1
-                    		exit 0                            
-                	else
-                    		echo "Invalid input: $USER_INPUT !(Expected Y/N)" >&2
-							echo "Please enter correct input: " >&2
-                	fi
-            	done
-            	SAVE_FILE="$OPTARG"
-        	else
-            	#file does not exist, set mkdir flag.
-            	SAVE_FILE="$OPTARG"
-        	fi
-            ;;
+			    	#wait on user input here (Y/N)
+			    	#if user says Y set writing directory to that
+			    	#if no then exit and ask for better input parameters
+			    	echo "-s $OPTARG already exists. Continue writing in file? (Y/N)" >&1
+			    	while true;
+			    	do
+					read USER_INPUT
+					if [[ "$USER_INPUT" == Y || "$USER_INPUT" == y ]]; then
+				    		echo "Using existing file $OPTARG" >&1
+				    		break
+					elif [[ "$USER_INPUT" == N || "$USER_INPUT" == n ]]; then
+				    		echo "Cancelled using save file $OPTARG Program exiting." >&1
+				    		exit 0                            
+					else
+				    		echo "Invalid input: $USER_INPUT !(Expected Y/N)" >&2
+						echo "Please enter correct input: " >&2
+					fi
+			    	done
+			    	SAVE_FILE="$OPTARG"
+			else
+		    		#file does not exist, set mkdir flag.
+		    		SAVE_FILE="$OPTARG"
+			fi
+			;;
         m)
         	if [[ -n $MODE ]]; then
             	echo "Invalid input: option -m has already been used!" >&2
@@ -340,7 +339,7 @@ done
 [[ $ALL_FREQUENCY == "1" ]] && octave_output="$(octave --silent --eval "load_build_model( ${FREQ_LIST[0]},$(( ${FREQ_LIST[$((${#FREQ_LIST[@]}-1))]} - 100 )) )" 2> /dev/null) "
 
 #Cleanup files
-rm "temp.data" "train_set.data" "test_set.data"
+#rm "temp.data" "train_set.data" "test_set.data"
 
 #Extract relevant informaton from octave
 #Generic information

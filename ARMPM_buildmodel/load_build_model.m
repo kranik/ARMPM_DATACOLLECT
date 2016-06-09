@@ -1,6 +1,6 @@
 function [] = load_build_model (freq_find,freq_next)
 
-fid = fopen ("/home/vokris/Work/ARMPM/ARMPM_buildmodel/train_set.data", "r");
+fid = fopen ("/home/kris/Work/ARMPM/ARMPM_buildmodel/train_set.data", "r");
 train_set = dlmread(fid,'\t',0,3);
 fclose (fid);
 
@@ -162,7 +162,7 @@ disp(["Model coefficients: " num2str(m',"%G\t")]);
     # Step 3: Additional validity for test set
     ###########################################################
     
-fid = fopen ("/home/vokris/Work/ARMPM/ARMPM_buildmodel/test_set.data", "r");
+fid = fopen ("/home/kris/Work/ARMPM/ARMPM_buildmodel/test_set.data", "r");
 test_set = dlmread(fid,'\t',0,2);
 fclose (fid);
 
