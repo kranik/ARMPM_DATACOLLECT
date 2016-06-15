@@ -415,13 +415,13 @@ IFS=";" read -a avg_pred_pow <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEG
 #Pred. Power Range
 IFS=";" read -a pred_pow_range <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Predicted" && $2=="Power" && $3=="Range"){ print $5 }}' ) | tr "\n" ";" | head -c -1)" 
 #Avg. Abs. Error
-IFS=";" read -a avg_abs_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Absolute" && $3=="Error:"){ print $4 }}' ) | tr "\n" ";" | head -c -1)" 
-#Abs. Err. Std. Dev. Error
-IFS=";" read -a std_dev_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Absolute" && $2=="Error" && $3=="Standart" && $4=="Deviation:"){ print $5 }}' ) | tr "\n" ";" | head -c -1)" 
-#Norm. Avg. Abs. Error
-IFS=";" read -a norm_avg_abs_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Normalised" && $2=="Average" && $3=="Absolute" && $4=="Error"){ print $6 }}' ) | tr "\n" ";" | head -c -1)"
-#Rel. Std. Dev
-IFS=";" read -a rel_std_dev <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Standart" && $3=="Deviation"){ print $5 }}' ) | tr "\n" ";" | head -c -1)"
+IFS=";" read -a avg_abs_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Absolute" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)" 
+#Abs. Err. Std. Dev.
+IFS=";" read -a std_dev_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Absolute" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)" 
+#Avg. Rel. Error
+IFS=";" read -a norm_avg_abs_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)"
+#Rel. Err. Std. Dev
+IFS=";" read -a rel_std_dev <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)"
 #Model coefficients
 IFS=";" read -a model_coeff <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Model" && $2=="coefficients:"){ print substr($0, index($0,$3)) }}' ) | tr "\n" ";" | head -c -1)" 
 
@@ -432,15 +432,15 @@ IFS=";" read -a model_coeff <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGI
 #I store the varaible references as special characters in the DATA string then eval to evoke subsittution. Eliminates repetitive code.
 case $MODE in
 	1)
-		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error\tAbsolute Error Stdandart Deviation\tNormalised Average Absolute Error [%]\tRelative Standart Deviation [%]\tModel coefficients"
+		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]\tModel coefficients"
 		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${norm_avg_abs_err[\$i]}\t\${rel_std_dev[\$i]}\t\${model_coeff[\$i]}"
 		;;
 	2)
-		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error\tAbsolute Error Stdandart Deviation\tNormalised Average Absolute Error [%]\tRelative Standart Deviation [%]"
+		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]"
 		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${norm_avg_abs_err[\$i]}\t\${rel_std_dev[\$i]}"
 		;;
 	3)
-		HEADER="Average Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error\tAbsolute Error Stdandart Deviation\tNormalised Average Absolute Error [%]\tRelative Standart Deviation [%]"
+		HEADER="Average Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]"
 		DATA="\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${norm_avg_abs_err[\$i]}\t\${rel_std_dev[\$i]}"
 		;;
 esac  

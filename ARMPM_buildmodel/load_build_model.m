@@ -20,37 +20,33 @@ test_reg=[ones(size(test_set,1),1),test_set(:,str2num(events_col).-start_col)];
 
 %Extract measured power and range from test data
 test_power=test_set(:,regressand_col.-start_col);
-maxMP=max(test_power);
-minMP=min(test_power);
-
 %Compute predicted power using model and events
 pred_power=(test_reg(:,:)*m);
-maxPP=max(pred_power);
-minPP=min(pred_power);
 
 %Compute absolute model errors
-err=(pred_power-test_power);
+err=(test_power-pred_power);
 abs_err=abs(err);
 avg_abs_err=mean(abs_err);
 std_dev_err=std(abs_err,1);
-%compute normalised model errors
-norm_avg_abs_err=mean((abs_err./abs(test_power))*100);
-rel_std_dev=(std_dev_err/avg_abs_err)*100;
+%compute realtive model errors and deviation
+rel_abs_err=abs(err./test_power)*100;
+rel_avg_abs_err=mean(rel_abs_err);
+rel_err_std_dev=std(rel_abs_err);
 
 disp("###########################################################");
 disp("Model validation against test set");
 disp("###########################################################");
 disp(["Average Power [W]: " num2str(mean(test_power),"%.5f")]); 
-disp(["Measured Power Range [%]: " num2str(100*(abs(maxMP-minMP)/abs(minMP)),"%.2f")]);
+disp(["Measured Power Range [%]: " num2str((range(test_power)./min(test_power))*100,"%.2f")]);
 disp("###########################################################"); 
 disp(["Average Predicted Power [W]: " num2str(mean(pred_power),"%.5f")]);  
-disp(["Predicted Power Range [%]: " num2str(100*(abs(maxPP-minPP)/abs(minPP)),"%.2f")]);
+disp(["Predicted Power Range [%]: " num2str((range(pred_power)./min(pred_power))*100,"%.2f")]);
 disp("###########################################################"); 
-disp(["Average Absolute Error: " num2str(avg_abs_err,"%.10f")]);
-disp(["Absolute Error Standart Deviation: " num2str(std_dev_err,"%.10f")]);
+disp(["Average Absolute Error [W]: " num2str(avg_abs_err,"%.10f")]);
+disp(["Absolute Error Standart Deviation [W]: " num2str(std_dev_err,"%.10f")]);
 disp("###########################################################");
-disp(["Normalised Average Absolute Error [%]: " num2str(norm_avg_abs_err,"%.2f")]);
-disp(["Relative Standart Deviation [%]: " num2str(rel_std_dev,"%.2f")]);
+disp(["Average Relative Error [%]: " num2str(rel_avg_abs_err,"%.2f")]);
+disp(["Relative Error Standart Deviation [%]: " num2str(rel_err_std_dev,"%.2f")]);
 disp("###########################################################");
 disp(["Model coefficients: " num2str(m',"%G\t")]);
 disp("###########################################################");
