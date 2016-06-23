@@ -20,6 +20,16 @@ benchmarkSplit () {
 	IFS="," read -a TEST_SET <<< "$temp"
 }
 
+getMean () {
+	local total=0
+	local -n array=$1
+	for i in `seq 0 $(($2-1))`
+	do
+		total=$(echo "scale = 0; $total+${array[$i]};" | bc )
+	done
+	echo $(echo "scale=2; $total/$2;" | bc )
+}
+
 #requires getops, but this should not be an issue since ints built in bash
 while getopts ":r:f:b:s:m:c:e:n:hac" opt;
 do
@@ -242,7 +252,6 @@ do
 				exit 1
 			fi
 			EVENTS_LIST="$OPTARG"
-			EVENTS_LIST_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_LIST" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
 		    	;;
 		n)
 			if [[ -n  $NUM_MODEL_EVENTS ]]; then
@@ -253,12 +262,16 @@ do
 				echo "Please specify events list file before selecting number of events in model(automatic)!" >&2
 				exit 1
 			fi
+			EVENTS_LIST_SIZE=$(echo $EVENTS_LIST | tr "," "\n" | wc -l)
 			#Check if number is within bounds, which is total number of events - 1 (regressand)
-			if [[ "$OPTARG" -gt $(( $EVENTS_COL_END - $EVENTS_COL_START )) || "$OPTARG" -le 0 ]]; then 
-				echo "Selected event -e $EVENT is out of bounds/invalid. Needs to be an integer value betweeen [1:`$EVENTS_COL_END-$EVENTS_COL_START`]." >&2
+			if [[ "$OPTARG" -gt $EVENTS_LIST_SIZE || "$OPTARG" -le 0 ]]; then 
+				echo "Selected number of events -n $EVENTS_LIST_SIZE is out of bounds/invalid. Needs to be an integer value betweeen [1:$EVENTS_LIST_SIZE]." >&2
 				exit 1
 			fi
+			#Initiate variables and unset events_list (since we use events_pool for the automatic list)
 	    		NUM_MODEL_EVENTS="$OPTARG"
+			EVENTS_POOL=$EVENTS_LIST
+			unset EVENTS_LIST
 		    	;;
 		a)
 			if [[ -n  $ALL_FREQUENCY ]]; then
@@ -300,7 +313,7 @@ if [[ -z $REGRESSAND_COL ]]; then
     	echo -e "====================" >&1
     	exit 1
 fi
-if [[ -z $EVENTS_LIST ]]; then
+if [[ -z $EVENTS_LIST && -z $EVENTS_POOL ]]; then
     	echo "No event list specified! Expected -e flag." >&2
     	echo -e "====================" >&1
     	exit 1
@@ -340,7 +353,7 @@ else
 fi
 echo -e "--------------------" >&1
 #Model type check
-if [[ -z ALL_FREQUENCY ]]; then
+if [[ -z $ALL_FREQUENCY ]]; then
     	echo "Computing per-frequency models!" >&1
 else
     	echo "Computing full frequency model!" >&1
@@ -364,13 +377,19 @@ echo -e "--------------------" >&1
 echo -e "Regressand Column:" >&1
 echo "$REGRESSAND_COL -> $REGRESSAND_LABEL" >&1
 echo -e "--------------------" >&1
-echo -e "Events list:" >&1
-echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
-echo -e "--------------------" >&1
 if [[ -z $NUM_MODEL_EVENTS ]]; then
+	EVENTS_LIST_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_LIST" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
     	echo "No maximum number of event specified (for automatic generation). Using full user specified list." >&1
+	echo -e "--------------------" >&1
+	echo -e "Events list:" >&1
+	echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
+	NUM_MODEL_EVENTS=0
 else
+	EVENTS_POOL_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
 	echo "Using user specified maximum number of events for automatic generation -> $NUM_MODEL_EVENTS" >&1
+	echo -e "--------------------" >&1
+	echo -e "Events pool:" >&1
+	echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
 fi
 echo -e "--------------------" >&1
 #Save file sanity check
@@ -380,6 +399,140 @@ else
 	echo "Using user specified output save file -> $SAVE_FILE" >&1
 fi
 echo -e "--------------------" >&1
+#Automatic model generation.
+echo -e "====================" >&1
+while [[ $NUM_MODEL_EVENTS -gt 0 ]]
+do
+	spaced_POOL="${EVENTS_POOL//,/ }"
+	echo -e "--------------------" >&1
+	if [[ $EVENTS_POOL != "\n" ]]; then
+		echo -e "Current events pool:" >&1
+		echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
+	else
+		echo "Current events pool -> (empty)" >&1
+	fi
+	echo -e "--------------------" >&1
+	for EV_TEMP in $spaced_POOL
+	do
+		#Initiate temp event list to collect results for
+		[[ -n $EVENTS_LIST ]] && EVENTS_LIST_TEMP="$EVENTS_LIST,$EV_TEMP" || EVENTS_LIST_TEMP="$EV_TEMP"
+		echo -e "********************" >&1
+		EV_TEMP_LABEL=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COL=$EV_TEMP 'BEGIN{FS=SEP}{if(NR==START){ print $COL; exit } }' < $RESULTS_FILE)
+		EVENTS_LIST_TEMP_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_LIST_TEMP" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+		echo "Checking event:" >&1
+		echo -e "$EV_TEMP -> $EV_TEMP_LABEL" >&1
+		echo "Temporaty events list:"
+		echo -e "$EVENTS_LIST_TEMP -> $EVENTS_LIST_TEMP_LABELS" >&1
+		#Uses temporary files generated for extracting the train and test set. Array indexing starts at 1 in awk.
+		#Also uses the extracted benchmark set files to pass arguments in octave since I found that to be the easiest way and quickest for bug checking.
+		if [[ -n $ALL_FREQUENCY ]]; then
+			#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
+			#Split data and collect output, then cleanup
+			touch "train_set.data" "test_set.data"
+			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
+			octave_output="$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST_TEMP')" 2> /dev/null)"
+			rm "train_set.data" "test_set.data"
+		else
+			#If per-frequency models, split benchmarks for each freqeuncy (with cleanup so we get fresh split every frequency)
+			#Then pass onto octave and store results in a concatenating string
+			#Sometimes octave bugs out and does not accept input correctly resulting in missing frequencies.
+			#I overcome that with a while loop which checks if we have collected data for all frequencies, if not repeat
+			#This bug is totally random and the only way to overcome it is to check and repeat (1 in every 5-6 times is faulty)	
+			unset -v data_count
+			while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
+			do
+				unset -v octave_output				
+				for count in `seq 0 $((${#FREQ_LIST[@]}-1))`
+				do
+					touch "train_set.data" "test_set.data"
+					awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+					awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
+					octave_output+="$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST_TEMP')" 2> /dev/null)"
+					rm "train_set.data" "test_set.data"
+				done
+				data_count="$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )"
+			done	
+		fi
+		#Analyse collected results
+		#Avg. Rel. Error
+		IFS=";" read -a norm_avg_abs_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)"
+		#Rel. Err. Std. Dev
+		#IFS=";" read -a rel_std_dev <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)"
+		#Check for bad events
+		if [[ " ${norm_avg_abs_err[@]} " =~ " Inf " ]]; then
+			#If relative error contains infinity then event is bad for linear regression as is removed from list
+			EVENTS_POOL=$(echo $EVENTS_POOL | sed "s/^$EV_TEMP,//g;s/,$EV_TEMP,/,/g;s/,$EV_TEMP$//g;s/^$EV_TEMP$//g")
+			echo "Bad Event (constant)!" >&1
+			echo "Removed from events pool." >&1
+		else
+			MEAN_NORM_AVG_ABS_ERR=$(getMean norm_avg_abs_err ${#norm_avg_abs_err[@]} )
+			echo "Mean Error -> $MEAN_NORM_AVG_ABS_ERR" >&1
+			#If events list exits
+			if [[ -n $EVENTS_LIST_MIN_ERR ]]; then
+				if [[ $(echo "$MEAN_NORM_AVG_ABS_ERR < $EVENTS_LIST_MIN_ERR" | bc -l) -eq 1 ]]; then
+					#Update events list error and EV
+					echo "Good event (improves minimum temporary model)! Using as new minimum!"
+					EV_ADD=$EV_TEMP
+					EVENTS_LIST_MIN_ERR=$MEAN_NORM_AVG_ABS_ERR
+				else
+					echo "Bad event (does not improve minimum temporary model)!" >&1
+				fi
+			else
+				#If no event list temp error present this means its the first event to check. Just add it as a new minimum
+				EVENTS_LIST_MIN_ERR=$MEAN_NORM_AVG_ABS_ERR
+				EV_ADD=$EV_TEMP
+				echo "Good event (first event in model)!" >&1
+			fi
+		fi 
+	done
+	echo -e "********************" >&1
+	echo "All events checked!" >&1
+	echo -e "********************" >&1
+	#Once going through all events see if we can populate events list
+	if [[ -n $EV_ADD ]]; then
+		#We found an new event to add to list
+		[[ -n $EVENTS_LIST ]] && EVENTS_LIST="$EVENTS_LIST,$EV_ADD" || EVENTS_LIST="$EV_ADD"
+		EV_ADD_LABEL=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COL=$EV_ADD 'BEGIN{FS=SEP}{if(NR==START){ print $COL; exit } }' < $RESULTS_FILE)
+		EVENTS_LIST_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_LIST" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+		EVENTS_POOL=$(echo $EVENTS_POOL | sed "s/^$EV_ADD,//g;s/,$EV_ADD,/,/g;s/,$EV_ADD$//g;s/^$EV_ADD$//g")
+		EVENTS_POOL_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+		#Remove from events pool
+		echo -e "--------------------" >&1
+		echo -e "********************" >&1
+		echo "Add best event to final list and remove from pool:"
+		echo "$EV_ADD -> $EV_ADD_LABEL" >&1
+		echo -e "********************" >&1
+		echo -e "New events list:" >&1
+		echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
+		echo -e "New model error -> $EVENTS_LIST_MIN_ERR" >&1
+		echo -e "********************" >&1
+		if [[ $EVENTS_POOL !=  "\n" ]]; then
+			echo "New events pool:" >&1
+			echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
+		else
+			echo "New events pool -> (empty)" >&1
+		fi
+		echo -e "********************" >&1
+		#reset EV_ADD too see if we can find another one and decrement counter
+		unset -v EV_ADD
+		((NUM_MODEL_EVENTS--))
+	else
+		EVENTS_LIST_SIZE=$(echo $EVENTS_LIST | tr "," "\n" | wc -l)
+		#We did not find a new event to add to list		
+		echo -e "--------------------" >&1
+		echo "No new improving event found. Events list minimised at $EVENTS_LIST_SIZE events." >&1
+		break
+	fi
+done
+
+echo -e "--------------------" >&1
+echo -e "====================" >&1
+echo -e "Oprimal events list found:" >&1
+echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
+echo -e "Events list avg. error -> $EVENTS_LIST_MIN_ERR" >&1
+echo -e "Using final list in full model analysis." >&1
+echo -e "====================" >&1
 
 #Uses temporary files generated for extracting the train and test set. Array indexing starts at 1 in awk.
 #Also uses the extracted benchmark set files to pass arguments in octave since I found that to be the easiest way and quickest for bug checking.
@@ -394,14 +547,21 @@ if [[ -n $ALL_FREQUENCY ]]; then
 else
 	#If per-frequency models, split benchmarks for each freqeuncy (with cleanup so we get fresh split every frequency)
 	#Then pass onto octave and store results in a concatenating string
-	octave_ouput=""
-	for i in `seq 0 $((${#FREQ_LIST[@]}-1))`
+	#Sometimes octave bugs out and does not accept input correctly resulting in missing frequencies.
+	#I overcome that with a while loop which checks if we have collected data for all frequencies, if not repeat
+	#This bug is totally random and the only way to overcome it is to check and repeat (1 in every 5-6 times is faulty)	
+	while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
 	do
-		touch "train_set.data" "test_set.data"
-		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$i]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
-		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$i]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 
-		octave_output+="$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)"
-		rm "train_set.data" "test_set.data"
+		unset -v octave_output				
+		for count in `seq 0 $((${#FREQ_LIST[@]}-1))`
+		do
+			touch "train_set.data" "test_set.data"
+			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
+			octave_output+="$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)"
+			rm "train_set.data" "test_set.data"
+		done
+		data_count="$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )"
 	done	
 fi
 
@@ -449,9 +609,9 @@ esac
 #If per-frequency models, iterate frequencies then print
 #If full frequency just print the one model
 if [[ -z $SAVE_FILE ]]; then
-	echo -e "===================="
+	echo -e "--------------------" >&1
 	echo -e $HEADER
-	echo -e "===================="
+	echo -e "--------------------" >&1
 else
 	echo -e $HEADER > $SAVE_FILE
 fi
@@ -465,6 +625,8 @@ do
 	#If all freqeuncy model, there is just one line that needs to be printed
 	[[ -n $ALL_FREQUENCY ]] && break;
 done
+echo -e "--------------------" >&1
 echo -e "====================" >&1
 echo "Script Done!" >&1
+echo -e "====================" >&1
 

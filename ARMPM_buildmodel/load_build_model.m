@@ -45,7 +45,7 @@ disp("###########################################################");
 disp(["Average Absolute Error [W]: " num2str(avg_abs_err,"%.10f")]);
 disp(["Absolute Error Standart Deviation [W]: " num2str(std_dev_err,"%.10f")]);
 disp("###########################################################");
-disp(["Average Relative Error [%]: " num2str(rel_avg_abs_err,"%.2f")]);
+disp(["Average Relative Error [%]: " num2str(rel_avg_abs_err,"%.5f")]);
 disp(["Relative Error Standart Deviation [%]: " num2str(rel_err_std_dev,"%.2f")]);
 disp("###########################################################");
 disp(["Model coefficients: " num2str(m',"%G\t")]);
