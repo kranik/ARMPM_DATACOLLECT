@@ -12,7 +12,7 @@ col_sep="\t"
 time_convert=1000000000
 
 #requires getops, but this should not be an issue since ints built in bash
-while getopts ":r:n:s:e:h" opt;
+while getopts ":r:n:s:h" opt;
 do
 	case $opt in
         	h)
@@ -133,8 +133,8 @@ fi
 						
 FREQ_LIST=$(ls $RESULTS_DIR/Run_${RUNS%% *} | tr " " "\n" | sort -gr | tr "\n" " ")						
 
-./process_raw_events.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
-./concatenate_results.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
+#./process_raw_events.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
+#./concatenate_results.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
 
 #Go into results directories and concatenate all the results files in to a big beast!
 for i in $RUNS;
