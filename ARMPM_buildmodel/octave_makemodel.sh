@@ -25,7 +25,7 @@ getMean () {
 	local -n array=$1
 	for i in `seq 0 $(($2-1))`
 	do
-		total=$(echo "scale = 0; $total+${array[$i]};" | bc )
+		total=$(echo "scale = 2; $total+${array[$i]};" | bc )
 	done
 	echo $(echo "scale=2; $total/$2;" | bc )
 }
@@ -522,16 +522,20 @@ do
 		#We did not find a new event to add to list		
 		echo -e "--------------------" >&1
 		echo "No new improving event found. Events list minimised at $EVENTS_LIST_SIZE events." >&1
+		echo -e "--------------------" >&1
+		echo -e "====================" >&1
+		echo -e "Optimal events list found:" >&1
+		echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
+		echo -e "Events list avg. error -> $EVENTS_LIST_MIN_ERR" >&1
+		echo -e "Using final list in full model analysis." >&1
+		echo -e "====================" >&1
 		break
 	fi
 done
 
-echo -e "--------------------" >&1
 echo -e "====================" >&1
-echo -e "Oprimal events list found:" >&1
+echo -e "Using events list:" >&1
 echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
-echo -e "Events list avg. error -> $EVENTS_LIST_MIN_ERR" >&1
-echo -e "Using final list in full model analysis." >&1
 echo -e "====================" >&1
 
 #Uses temporary files generated for extracting the train and test set. Array indexing starts at 1 in awk.
@@ -549,7 +553,8 @@ else
 	#Then pass onto octave and store results in a concatenating string
 	#Sometimes octave bugs out and does not accept input correctly resulting in missing frequencies.
 	#I overcome that with a while loop which checks if we have collected data for all frequencies, if not repeat
-	#This bug is totally random and the only way to overcome it is to check and repeat (1 in every 5-6 times is faulty)	
+	#This bug is totally random and the only way to overcome it is to check and repeat (1 in every 5-6 times is faulty)
+	unset -v data_count	
 	while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
 	do
 		unset -v octave_output				
