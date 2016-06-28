@@ -6,6 +6,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 NUM_MODES=3
+NUM_TYPES=3
 
 benchmarkSplit () {
 	#extract uniques benchmark list from file
@@ -31,7 +32,7 @@ getMean () {
 }
 
 #requires getops, but this should not be an issue since ints built in bash
-while getopts ":r:f:b:s:m:c:e:n:hac" opt;
+while getopts ":r:f:b:s:m:t:c:e:n:hac" opt;
 do
 	case $opt in
 		h)
@@ -45,7 +46,8 @@ do
 			echo "-n [NUMBER] -> Specify max number of events to include in automatic model generation." >&1
 			echo "-a -> Use flag to specify all frequencies model instead of per frequency one." >&1
 			echo "-m [NUMBER: 1:$NUM_MODES]-> Mode of operation: 1 -> Measured physical data, full model performance and model coefficients; 2 -> Measured physical data and model performance; 3 -> Model performance;" >&1
-			echo "Mandatory options are: -r, -b, -c, -e, -m"
+			echo "-t [NUMBER: 1:$NUM_TYPES]-> Type of model: 1 -> Minimal absolute error; 2 -> Minimal absolute error standart deviation;" >&1
+			echo "Mandatory options are: -r, -b, -c, -e, -m, -t"
 			exit 0 
 			;;
 
@@ -202,6 +204,19 @@ do
 			fi		
 			MODE="$OPTARG"      	
 			;;
+		t)
+			if [[ -n $MODEL_TYPE ]]; then
+		    		echo "Invalid input: option -t has already been used!" >&2
+		    		exit 1                
+			fi
+			if [[ $OPTARG != "1" && $OPTARG != "2" ]]; then 
+				echo "Invalid operarion: -t $MODEL_TYPE! Options are: [1:$NUM_TYPES]." >&2
+				echo "Use -h flag for more information on the available modes." >&2
+			    	echo -e "===================="
+			    	exit 1
+			fi		
+			MODEL_TYPE="$OPTARG"      	
+			;;
 		c)
 			if [[ -n  $REGRESSAND_COL ]]; then
 		    		echo "Invalid input: option -c has already been used!" >&2
@@ -303,6 +318,11 @@ if [[ -z $MODE ]]; then
     	echo -e "====================" >&1
     	exit 1
 fi
+if [[ -z $MODEL_TYPE ]]; then
+    	echo "No model type specified! Expected -t flag." >&2
+    	echo -e "====================" >&1
+    	exit 1
+fi
 if [[ -z $BENCH_FILE ]]; then
 	echo "No benchmark file specified! Please use flag with existing file or an empty file to gererate random benchmark split." >&2
 	echo -e "====================" >&1
@@ -373,6 +393,17 @@ case $MODE in
 		;;
 esac
 echo -e "--------------------" >&1
+#Model type sanity checks
+echo "Specified model type:" >&1
+case $MODEL_TYPE in
+	1)
+		echo "$MODEL_TYPE -> Minimize model absolute error." >&1
+		;;
+	2) 
+		echo "$MODEL_TYPE -> Minimize model absolute error standart deviation." >&1
+		;;
+esac
+echo -e "--------------------" >&1
 #Events sanity checks
 echo -e "Regressand Column:" >&1
 echo "$REGRESSAND_COL -> $REGRESSAND_LABEL" >&1
@@ -431,7 +462,7 @@ do
 			touch "train_set.data" "test_set.data"
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
-			octave_output="$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST_TEMP')" 2> /dev/null)"
+			octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST_TEMP')" 2> /dev/null)
 			rm "train_set.data" "test_set.data"
 		else
 			#If per-frequency models, split benchmarks for each freqeuncy (with cleanup so we get fresh split every frequency)
@@ -448,39 +479,53 @@ do
 					touch "train_set.data" "test_set.data"
 					awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 					awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
-					octave_output+="$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST_TEMP')" 2> /dev/null)"
+					octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST_TEMP')" 2> /dev/null)
 					rm "train_set.data" "test_set.data"
 				done
-				data_count="$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )"
+				data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
 			done	
 		fi
 		#Analyse collected results
 		#Avg. Rel. Error
-		IFS=";" read -a norm_avg_abs_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)"
+		IFS=";" read -a rel_avg_abs_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
 		#Rel. Err. Std. Dev
-		#IFS=";" read -a rel_std_dev <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)"
+		IFS=";" read -a rel_avg_abs_err_std_dev <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)
 		#Check for bad events
-		if [[ " ${norm_avg_abs_err[@]} " =~ " Inf " ]]; then
+		if [[ " ${rel_avg_abs_err[@]} " =~ " Inf " ]]; then
 			#If relative error contains infinity then event is bad for linear regression as is removed from list
 			EVENTS_POOL=$(echo $EVENTS_POOL | sed "s/^$EV_TEMP,//g;s/,$EV_TEMP,/,/g;s/,$EV_TEMP$//g;s/^$EV_TEMP$//g")
 			echo "Bad Event (constant)!" >&1
 			echo "Removed from events pool." >&1
 		else
-			MEAN_NORM_AVG_ABS_ERR=$(getMean norm_avg_abs_err ${#norm_avg_abs_err[@]} )
-			echo "Mean Error -> $MEAN_NORM_AVG_ABS_ERR" >&1
+			MEAN_REL_AVG_ABS_ERR=$(getMean rel_avg_abs_err ${#rel_avg_abs_err[@]} )
+			MEAN_REL_AVG_ABS_ERR_STD_DEV=$(getMean rel_avg_abs_err_std_dev ${#rel_avg_abs_err_std_dev[@]} )
+			echo "Mean model relative error -> $MEAN_REL_AVG_ABS_ERR" >&1
+			echo "Mean model relative error stdandart deviation -> $MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
+			case $MODEL_TYPE in
+			1)
+				EVENTS_LIST_NEW=$MEAN_REL_AVG_ABS_ERR
+				;;
+			2)
+				EVENTS_LIST_NEW=$MEAN_REL_AVG_ABS_ERR_STD_DEV
+				;;
+			esac
 			#If events list exits
-			if [[ -n $EVENTS_LIST_MIN_ERR ]]; then
-				if [[ $(echo "$MEAN_NORM_AVG_ABS_ERR < $EVENTS_LIST_MIN_ERR" | bc -l) -eq 1 ]]; then
+			if [[ -n $EVENTS_LIST_MIN ]]; then
+				if [[ $(echo "$EVENTS_LIST_NEW < $EVENTS_LIST_MIN" | bc -l) -eq 1 ]]; then
 					#Update events list error and EV
 					echo "Good event (improves minimum temporary model)! Using as new minimum!"
 					EV_ADD=$EV_TEMP
-					EVENTS_LIST_MIN_ERR=$MEAN_NORM_AVG_ABS_ERR
+					EVENTS_LIST_MIN=$EVENTS_LIST_NEW
+					EVENTS_LIST_MEAN_REL_AVG_ABS_ERR=$MEAN_REL_AVG_ABS_ERR
+					EVENTS_LIST_MEAN_REL_AVG_ABS_ERR_STD_DEV=$MEAN_REL_AVG_ABS_ERR_STD_DEV
 				else
 					echo "Bad event (does not improve minimum temporary model)!" >&1
 				fi
 			else
 				#If no event list temp error present this means its the first event to check. Just add it as a new minimum
-				EVENTS_LIST_MIN_ERR=$MEAN_NORM_AVG_ABS_ERR
+				EVENTS_LIST_MIN=$EVENTS_LIST_NEW
+				EVENTS_LIST_MEAN_REL_AVG_ABS_ERR=$MEAN_REL_AVG_ABS_ERR
+				EVENTS_LIST_MEAN_REL_AVG_ABS_ERR_STD_DEV=$MEAN_REL_AVG_ABS_ERR_STD_DEV
 				EV_ADD=$EV_TEMP
 				echo "Good event (first event in model)!" >&1
 			fi
@@ -505,7 +550,8 @@ do
 		echo -e "********************" >&1
 		echo -e "New events list:" >&1
 		echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
-		echo -e "New model error -> $EVENTS_LIST_MIN_ERR" >&1
+		echo -e "New mean model relative error -> $EVENTS_LIST_MEAN_REL_AVG_ABS_ERR" >&1
+		echo -e "New mean model relative error stdandart deviation -> $EVENTS_LIST_MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
 		echo -e "********************" >&1
 		if [[ $EVENTS_POOL !=  "\n" ]]; then
 			echo "New events pool:" >&1
@@ -526,7 +572,8 @@ do
 		echo -e "====================" >&1
 		echo -e "Optimal events list found:" >&1
 		echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
-		echo -e "Events list avg. error -> $EVENTS_LIST_MIN_ERR" >&1
+		echo -e "Events list mean model relative error -> $EVENTS_LIST_MEAN_REL_AVG_ABS_ERR" >&1
+		echo -e "Events list mean model relative error stdandart deviation -> $EVENTS_LIST_MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
 		echo -e "Using final list in full model analysis." >&1
 		echo -e "====================" >&1
 		break
@@ -546,7 +593,7 @@ if [[ -n $ALL_FREQUENCY ]]; then
 	touch "train_set.data" "test_set.data"
 	awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 	awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
-	octave_output="$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)"
+	octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
 	rm "train_set.data" "test_set.data"
 else
 	#If per-frequency models, split benchmarks for each freqeuncy (with cleanup so we get fresh split every frequency)
@@ -563,32 +610,32 @@ else
 			touch "train_set.data" "test_set.data"
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
-			octave_output+="$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)"
+			octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
 			rm "train_set.data" "test_set.data"
 		done
-		data_count="$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )"
+		data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
 	done	
 fi
 
 #Extract relevant informaton from octave
 #Avg. Power
-IFS=";" read -a avg_pow <<< "$((echo "$octave_output" |awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Power"){ print $4 }}' ) | tr "\n" ";" | head -c -1)" 
+IFS=";" read -a avg_pow <<< $((echo "$octave_output" |awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Power"){ print $4 }}' ) | tr "\n" ";" | head -c -1)
 #Measured Power Range
-IFS=";" read -a pow_range <<< "$((echo "$octave_output" |awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Measured" && $2=="Power" && $3=="Range"){ print $5 }}' ) | tr "\n" ";" | head -c -1)"
+IFS=";" read -a pow_range <<< $((echo "$octave_output" |awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Measured" && $2=="Power" && $3=="Range"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
 #Average Pred. Power
-IFS=";" read -a avg_pred_pow <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Predicted" && $3=="Power"){ print $5 }}' ) | tr "\n" ";" | head -c -1)" 
+IFS=";" read -a avg_pred_pow <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Predicted" && $3=="Power"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
 #Pred. Power Range
-IFS=";" read -a pred_pow_range <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Predicted" && $2=="Power" && $3=="Range"){ print $5 }}' ) | tr "\n" ";" | head -c -1)" 
+IFS=";" read -a pred_pow_range <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Predicted" && $2=="Power" && $3=="Range"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
 #Avg. Abs. Error
-IFS=";" read -a avg_abs_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Absolute" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)" 
+IFS=";" read -a avg_abs_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Absolute" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
 #Abs. Err. Std. Dev.
-IFS=";" read -a std_dev_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Absolute" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)" 
+IFS=";" read -a std_dev_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Absolute" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)
 #Avg. Rel. Error
-IFS=";" read -a norm_avg_abs_err <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)"
+IFS=";" read -a rel_avg_abs_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
 #Rel. Err. Std. Dev
-IFS=";" read -a rel_std_dev <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)"
+IFS=";" read -a rel_avg_abs_err_std_dev <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)
 #Model coefficients
-IFS=";" read -a model_coeff <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Model" && $2=="coefficients:"){ print substr($0, index($0,$3)) }}' ) | tr "\n" ";" | head -c -1)" 
+IFS=";" read -a model_coeff <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Model" && $2=="coefficients:"){ print substr($0, index($0,$3)) }}' ) | tr "\n" ";" | head -c -1)
 
 #Modify freqeuncy list first element to list "all"
 [[ -n $ALL_FREQUENCY ]] && FREQ_LIST[0]=$(echo "all")
@@ -598,15 +645,15 @@ IFS=";" read -a model_coeff <<< "$((echo "$octave_output" | awk -v SEP=' ' 'BEGI
 case $MODE in
 	1)
 		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]\tModel coefficients"
-		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${norm_avg_abs_err[\$i]}\t\${rel_std_dev[\$i]}\t\${model_coeff[\$i]}"
+		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}\t\${model_coeff[\$i]}"
 		;;
 	2)
 		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]"
-		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${norm_avg_abs_err[\$i]}\t\${rel_std_dev[\$i]}"
+		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}"
 		;;
 	3)
 		HEADER="Average Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]"
-		DATA="\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${norm_avg_abs_err[\$i]}\t\${rel_std_dev[\$i]}"
+		DATA="\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}"
 		;;
 esac  
 
