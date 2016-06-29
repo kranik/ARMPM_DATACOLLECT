@@ -7,7 +7,7 @@ fi
 
 #Internal variable for quickly setting maximum number of modes and model types
 NUM_MODES=3
-NUM_TYPES=3
+NUM_TYPES=2
 
 #Extract unique benchmark split from results file
 benchmarkSplit () {
