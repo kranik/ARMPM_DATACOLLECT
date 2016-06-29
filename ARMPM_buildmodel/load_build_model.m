@@ -31,7 +31,7 @@ std_dev_err=std(abs_err,1);
 %compute realtive model errors and deviation
 rel_abs_err=abs(err./test_power)*100;
 rel_avg_abs_err=mean(rel_abs_err);
-rel_err_std_dev=std(rel_abs_err);
+rel_err_std_dev=std(rel_abs_err,1);
 
 disp("###########################################################");
 disp("Model validation against test set");

@@ -5,22 +5,29 @@ if [[ "$#" -eq 0 ]]; then
 	exit 1
 fi
 
+#Internal variable for quickly setting maximum number of modes and model types
 NUM_MODES=3
 NUM_TYPES=3
 
+#Extract unique benchmark split from results file
 benchmarkSplit () {
-	#extract uniques benchmark list from file
+	#Read and randomise benchmarks, assumes column 2 is benchmarks.
+	#I can automate this by searching the header and extracting column number if I need to, but this is very rarely used.
 	local RANDOM_BENCHMARK_LIST=$(echo $(awk -v SEP='\t' -v START=$RESULTS_START_LINE -v BENCH=0 'BEGIN{FS=SEP}{ if(NR > START && $2 != BENCH){print ($2);BENCH=$2} }' < $RESULTS_FILE | sort -u | sort -R ) | sed 's/ /\\n/g' )
 	local NUM_BENCH=$(echo -e "$RANDOM_BENCHMARK_LIST" | wc -l)
+	#Get midpoint to split the randomised list
 	local MIDPOINT=$(echo "scale = 0; $NUM_BENCH/2;" | bc )
-	
-	#I need to use this temp to extract the string I have no ida why just plain substitution in the IFT line does not work
+	#I need to use this temp to extract the string
+	#Bash gets confused with too many variable substitutions, that why I need the temp
 	local temp=$(echo $(echo -e $RANDOM_BENCHMARK_LIST | head -n $MIDPOINT | sort -d ) | sed 's/ /,/g')
 	IFS="," read -a TRAIN_SET <<< "$temp"
 	local temp=$(echo $(echo -e $RANDOM_BENCHMARK_LIST | tail -n $(echo "scale = 0; $NUM_BENCH-$MIDPOINT;" | bc ) | sort -d ) | sed 's/ /,/g')
 	IFS="," read -a TEST_SET <<< "$temp"
 }
 
+#Simple script to get the mean of an array
+#Need to pass the name of the array as first argument and then the element count as second argument
+#Then use BC to compute mean since bash has just integer logic and we are almost surely dealing with fractions for the mean
 getMean () {
 	local total=0
 	local -n array=$1
@@ -431,6 +438,8 @@ else
 fi
 echo -e "--------------------" >&1
 #Automatic model generation.
+#It will keep going as long as we have not saturated the model (no further events contribute) or we reach max number of model events as specified by user
+#If we dont want automatic we just initialise NUM_MODEL_EVENTS to 0 and skip this loop. EZPZ
 echo -e "====================" >&1
 while [[ $NUM_MODEL_EVENTS -gt 0 ]]
 do
@@ -497,6 +506,8 @@ do
 			echo "Bad Event (constant)!" >&1
 			echo "Removed from events pool." >&1
 		else
+			#Get the means for both relative error and standart deviation and output
+			#Depending oon type though we use a different value for EVENTS_LIST_NEW to try and minmise
 			MEAN_REL_AVG_ABS_ERR=$(getMean rel_avg_abs_err ${#rel_avg_abs_err[@]} )
 			MEAN_REL_AVG_ABS_ERR_STD_DEV=$(getMean rel_avg_abs_err_std_dev ${#rel_avg_abs_err_std_dev[@]} )
 			echo "Mean model relative error -> $MEAN_REL_AVG_ABS_ERR" >&1
@@ -509,8 +520,8 @@ do
 				EVENTS_LIST_NEW=$MEAN_REL_AVG_ABS_ERR_STD_DEV
 				;;
 			esac
-			#If events list exits
 			if [[ -n $EVENTS_LIST_MIN ]]; then
+				#If events list exits then compare new value and if smaller then store else just move along the events list 
 				if [[ $(echo "$EVENTS_LIST_NEW < $EVENTS_LIST_MIN" | bc -l) -eq 1 ]]; then
 					#Update events list error and EV
 					echo "Good event (improves minimum temporary model)! Using as new minimum!"
@@ -565,7 +576,7 @@ do
 		((NUM_MODEL_EVENTS--))
 	else
 		EVENTS_LIST_SIZE=$(echo $EVENTS_LIST | tr "," "\n" | wc -l)
-		#We did not find a new event to add to list		
+		#We did not find a new event to add to list. Just output and break loop (list saturated)		
 		echo -e "--------------------" >&1
 		echo "No new improving event found. Events list minimised at $EVENTS_LIST_SIZE events." >&1
 		echo -e "--------------------" >&1
@@ -585,22 +596,16 @@ echo -e "Using events list:" >&1
 echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
 echo -e "====================" >&1
 
-#Uses temporary files generated for extracting the train and test set. Array indexing starts at 1 in awk.
-#Also uses the extracted benchmark set files to pass arguments in octave since I found that to be the easiest way and quickest for bug checking.
+#This part is for outputing a specified events list or just using the automatically generated one and passing it onto octave
+#Anyhow its mandatory to extract results so its always executed even if we skip automatic generation
+#Its the same as the automatic generation collection logic, except for the all the automatic iteration, we just use one events list with octave
 if [[ -n $ALL_FREQUENCY ]]; then
-	#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
-	#Split data and collect output, then cleanup
 	touch "train_set.data" "test_set.data"
 	awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 	awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
 	octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
 	rm "train_set.data" "test_set.data"
 else
-	#If per-frequency models, split benchmarks for each freqeuncy (with cleanup so we get fresh split every frequency)
-	#Then pass onto octave and store results in a concatenating string
-	#Sometimes octave bugs out and does not accept input correctly resulting in missing frequencies.
-	#I overcome that with a while loop which checks if we have collected data for all frequencies, if not repeat
-	#This bug is totally random and the only way to overcome it is to check and repeat (1 in every 5-6 times is faulty)
 	unset -v data_count	
 	while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
 	do
@@ -616,7 +621,6 @@ else
 		data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
 	done	
 fi
-
 #Extract relevant informaton from octave
 #Avg. Power
 IFS=";" read -a avg_pow <<< $((echo "$octave_output" |awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Power"){ print $4 }}' ) | tr "\n" ";" | head -c -1)
@@ -639,7 +643,6 @@ IFS=";" read -a model_coeff <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN
 
 #Modify freqeuncy list first element to list "all"
 [[ -n $ALL_FREQUENCY ]] && FREQ_LIST[0]=$(echo "all")
-	
 #Adjust output depending on mode  	
 #I store the varaible references as special characters in the DATA string then eval to evoke subsittution. Eliminates repetitive code.
 case $MODE in
