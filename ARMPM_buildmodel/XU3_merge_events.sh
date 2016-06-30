@@ -93,7 +93,7 @@ do
 				eval RESULTS_CURR_COLUMN_$RF_NUM=$(awk -v SEP='\t' -v START=$(( $(eval echo -e "\$RESULTS_START_LINE_$RF_NUM") - 1 )) 'BEGIN{FS=SEP}{if(NR==START){ for(i=1;i<=NF;i++){ if($i ~ /Current/) { print i; exit} } } }' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM") )
 				#PMU Events (one column after cycles until end of columns)
 				eval RESULTS_EV_START_COLUMN_$RF_NUM=$(( $(eval echo -e "\$RESULTS_CCYCLES_COLUMN_$RF_NUM") + 1 ))
-				#Extrating the event names (header) is a bit tricky. First we store the events as string in temo (note events separated by commas not tabs)
+				#Extrating the event names (header) is a bit tricky. First we store the events as string in temp (note events separated by commas not tabs)
 				#We do this so we can pick them up with the eval variable, otherwise every spaced entry is a new command so we cant add them just as a string
 				#Also we avoid tabs since echo stores them as spaces, only way around is to separate with commas then tr the final output
 				temp=$((awk -v SEP='\t' -v START=$(( $(eval echo -e "\$RESULTS_START_LINE_$RF_NUM") - 1 )) -v COL_START=$(eval echo -e "\$RESULTS_EV_START_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){ for(i=COL_START;i<=NF;i++) print $i} }' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM")) | tr "\n" "," | head -c -1)
@@ -147,9 +147,15 @@ if [[ "$RF_NUM" -eq 0 ]]; then
     	exit 1
 fi
 
+if [[ "$RF_NUM" -eq 1 ]]; then
+    	echo "Please input more that one files to merge. Expected 2 or more -r flags!" >&2
+    	exit 1
+fi
+
 #Sanity checks and events header preparation
 for i in `seq 1 $RF_NUM`
 do
+	eval MERGE_LINE_$RF_NUM=$(eval echo -e "\$RESULTS_START_LINE_$RF_NUM")
 	echo -e "====================" >&1
 	echo -e "--------------------" >&1	
 	eval echo -e "File -\> \$RESULTS_FILE_$i" >&1
@@ -200,6 +206,8 @@ MAIN_HEADER+=","
 MAIN_HEADER+=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE_1-1)) -v COL=$RESULTS_POWER_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START && i=COL ){ print $i} }' < $RESULTS_FILE_1)
 MAIN_HEADER+=","
 MAIN_HEADER+=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE_1-1)) -v COL=$RESULTS_CCYCLES_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START && i=COL ){ print $i} }' < $RESULTS_FILE_1)
+#Initiate MAIN_LINE pointer
+MAIN_LINE=$RESULTS_START_LINE_1
 #Output header
 #It has a built in tab between main and events header due to a leading comma at the events header
 if [[ -z $SAVE_FILE ]]; then
@@ -210,12 +218,171 @@ else
 	echo -e "$MAIN_HEADER$EVENTS_HEADER" | tr "," "\t" > $SAVE_FILE
 fi
 
-echo -e "Merging files" >&1
 #Main merging part of the script
+while [[ $MAIN_LINE -le $(wc -l $RESULTS_FILE_1 | awk '{print $1}') ]];
+do
+	#Extract main file sync points
+	MAIN_RUN=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_RUN_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $RESULTS_FILE_1)
+	MAIN_FREQ=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_FREQ_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $RESULTS_FILE_1)
+	MAIN_BENCH=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_BENCH_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print$COL;exit}}' < $RESULTS_FILE_1)
+	#Extract and initialise sync columns to average
+	TIMESTAMP_TOTAL=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_TIMESTAMP_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print$COL;exit}}' < $RESULTS_FILE_1)
+	POWER_TOTAL=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_POWER_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print$COL;exit}}' < $RESULTS_FILE_1)
+	CCYCLES_TOTAL=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_CCYCLES_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print$COL;exit}}' < $RESULTS_FILE_1)
+	TEMP_TOTAL=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_TEMP_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print$COL;exit}}' < $RESULTS_FILE_1)
+	VOLT_TOTAL=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_VOLT_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print$COL;exit}}' < $RESULTS_FILE_1)
+	CURR_TOTAL=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_CURR_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){print$COL;exit}}' < $RESULTS_FILE_1)
+	EVENTS_TOTAL=$((awk -v SEP='\t' -v START=$MAIN_LINE -v COL_START=$RESULTS_EV_START_COLUMN_1 'BEGIN{FS=SEP}{if(NR==START){for(i=COL_START;i<=NF;i++){print $i}}}' < $RESULTS_FILE_1) | tr "\n" "\t" | head -c -1) 
+	for i in `seq 2 $RF_NUM`
+	do
+		#Extract merge file sync points
+		MERGE_RUN=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_RUN_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		MERGE_FREQ=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_FREQ_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		MERGE_BENCH=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_BENCH_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		#Test sync points
+		#Test run sync
+		if [[ $MAIN_RUN -ne $MERGE_RUN ]]; then
+			#Run is out of sync. Find next sync points for main and merge files
+			MAIN_SYNC_LINE=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_RUN_COLUMN_1 -v SYNC=$MERGE_RUN 'BEGIN{FS=SEP}{if(NR>=START&&$COL==SYNC){print NR;exit}}' < $RESULTS_FILE_1)
+			MERGE_SYNC_LINE=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_RUN_COLUMN_$RF_NUM") -v SYNC=$MAIN_RUN 'BEGIN{FS=SEP}{if(NR>=START&&$COL==SYNC){print NR;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+			if [[ -z $MAIN_SYNC_LINE && -z $MERGE_SYNC_LINE ]]; then
+				#No sync points found for both files so just break loops. End of merging
+				break 2
+			elif [[ -z $MERGE_SYNC_LINE ]]; then
+				#No merge sync line found but main sync line exists, update main pointer; break and repeat files merge loop
+				#The reason we use continue 2 is to prevent the averaging that comes after the file merge loop
+				MAIN_LINE=$MAIN_SYNC_LINE
+				continue 2
+			elif [[ -z $MAIN_SYNC_LINE ]]; then
+				#No main sync line found but main sync line exists, update main pointer; break and repeat files merge loop
+				eval MERGE_LINE_$RF_NUM=$MERGE_SYNC_LINE
+				continue 2
+			else
+				MAIN_SYNC_DIFF=$($MAIN_SYNC_LINE-$MAIN_LINE)
+				MERGE_SYNC_DIFF=$($MERGE_SYNC_LINE-$(eval echo -e "\$MERGE_LINE_$RF_NUM"))
+				#Both sync points exist. Compare difference and choose the closest one
+				if [[ $MAIN_SYNC_DIFF -le $MERGE_SYNC_DIFF ]]; then
+					#Main sync point is closer (or equal). Update main line pointer and repeat sync loop
+					MAIN_LINE=$MAIN_SYNC_LINE
+					continue 2
+				else
+					#Merge sync point is closer. Update merge pointer and repeat sync loop
+					eval MERGE_LINE_$RF_NUM=$MERGE_SYNC_LINE
+					continue 2
+				fi
+			fi
+		fi
+		#Test freq sync
+		if [[ $MAIN_FREQ -ne $MERGE_FREQ ]]; then
+			#Freq is out of sync. Find next sync points for main and merge files
+			MAIN_SYNC_LINE=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_FREQ_COLUMN_1 -v SYNC=$MERGE_FREQ 'BEGIN{FS=SEP}{if(NR>=START&&$COL==SYNC){print NR;exit}}' < $RESULTS_FILE_1)
+			MAIN_SYNC_DIFF=$($MAIN_SYNC_LINE-$MAIN_LINE)
+			MERGE_SYNC_LINE=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_FREQ_COLUMN_$RF_NUM") -v SYNC=$MAIN_FREQ 'BEGIN{FS=SEP}{if(NR>=START&&$COL==SYNC){print NR;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+			MERGE_SYNC_DIFF=$($MERGE_SYNC_LINE-$(eval echo -e "\$MERGE_LINE_$RF_NUM"))
+			if [[ -z $MAIN_SYNC_LINE && -z $MERGE_SYNC_LINE ]]; then
+				#No sync points found for both files so just break loops. End of merging
+				break 2
+			elif [[ -z $MERGE_SYNC_LINE ]]; then
+				#No merge sync line found but main sync line exists, update main pointer; break (with continue) and repeat files merge loop
+				MAIN_LINE=$MAIN_SYNC_LINE
+				continue 2
+			elif [[ -z $MAIN_SYNC_LINE ]]; then
+				#No main sync line found but main sync line exists, update main pointer; break and repeat files merge loop
+				eval MERGE_LINE_$RF_NUM=$MERGE_SYNC_LINE
+				continue 2
+			else
+				#Both sync points exist. Compare difference and choose the closest one
+				if [[ $MAIN_SYNC_DIFF -le $MERGE_SYNC_DIFF ]]; then
+					#Main sync point is closer (or equal). Update main line pointer and repeat sync loop
+					MAIN_LINE=$MAIN_SYNC_LINE
+					continue 2
+				else
+					#Merge sync point is closer. Update merge pointer and repeat sync loop
+					eval MERGE_LINE_$RF_NUM=$MERGE_SYNC_LINE
+					continue 2
+				fi
+			fi
+		fi
+		#Test bench sync
+		if [[ $MAIN_BENCH -ne $MERGE_BENCH ]]; then
+			#Bench is out of sync. Find next sync points for main and merge files
+			MAIN_SYNC_LINE=$(awk -v SEP='\t' -v START=$MAIN_LINE -v COL=$RESULTS_BENCH_COLUMN_1 -v SYNC=$MERGE_BENCH 'BEGIN{FS=SEP}{if(NR>=START&&$COL==SYNC){print NR;exit}}' < $RESULTS_FILE_1)
+			MAIN_SYNC_DIFF=$($MAIN_SYNC_LINE-$MAIN_LINE)
+			MERGE_SYNC_LINE=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_BENCH_COLUMN_$RF_NUM") -v SYNC=$MAIN_BENCH 'BEGIN{FS=SEP}{if(NR>=START&&$COL==SYNC){print NR;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+			MERGE_SYNC_DIFF=$($MERGE_SYNC_LINE-$(eval echo -e "\$MERGE_LINE_$RF_NUM"))
+			if [[ -z $MAIN_SYNC_LINE && -z $MERGE_SYNC_LINE ]]; then
+				#No sync points found for both files so just break loops. End of merging
+				break 2
+			elif [[ -z $MERGE_SYNC_LINE ]]; then
+				#No merge sync line found but main sync line exists, update main pointer; break and repeat files merge loop
+				MAIN_LINE=$MAIN_SYNC_LINE
+				continue 2
+			elif [[ -z $MAIN_SYNC_LINE ]]; then
+				#No main sync line found but main sync line exists, update main pointer; break and repeat files merge loop
+				eval MERGE_LINE_$RF_NUM=$MERGE_SYNC_LINE
+				continue 2
+			else
+				#Both sync points exist. Compare difference and choose the closest one
+				if [[ $MAIN_SYNC_DIFF -le $MERGE_SYNC_DIFF ]]; then
+					#Main sync point is closer (or equal). Update main line pointer and repeat sync loop
+					MAIN_LINE=$MAIN_SYNC_LINE
+					continue 2
+				else
+					#Merge sync point is closer. Update merge pointer and repeat sync loop
+					eval MERGE_LINE_$RF_NUM=$MERGE_SYNC_LINE
+					continue 2
+				fi
+			fi
+		fi
+		#Sync points tested. Meaning file data can be merged. Extract rest of points and merge
+		#Add timestamp
+		MERGE_TIMESTAMP=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_TIMESTAMP_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		TIMESTAMP_TOTAL=$(echo "$TIMESTAMP_TOTAL+$MERGE_TIMESTAMP;" | bc )
+		#Add power
+		MERGE_POWER=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_POWER_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		POWER_TOTAL=$(echo "$POWER_TOTAL+$MERGE_POWER;" | bc )
+		#Add cpu cycles
+		MERGE_CCYCLES=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_CCYCLES_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		CCYCLES_TOTAL=$(echo "$CCYCLES_TOTAL+$MERGE_CCYCLES;" | bc )
+		#Add temp
+		MERGE_TEMP=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_TEMP_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		TEMP_TOTAL=$(echo "$TEMP_TOTAL+$MERGE_TEMP;" | bc )
+		#Add volt
+		MERGE_VOLT=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_VOLT_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		VOLT_TOTAL=$(echo "$VOLT_TOTAL+$MERGE_VOLT;" | bc )
+		#Add curr
+		MERGE_CURR=$(awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL=$(eval echo -e "\$RESULTS_CURR_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){print $COL;exit}}' < $(eval echo -e "\$RESULTS_FILE_$RF_NUM"))
+		CURR_TOTAL=$(echo "$CURR_TOTAL+$MERGE_CURR;" | bc )
+		#Add events
+		EVENTS_TOTAL+="\t"$((awk -v SEP='\t' -v START=$(eval echo -e "\$MERGE_LINE_$RF_NUM") -v COL_START=$(eval echo -e "\$RESULTS_EV_START_COLUMN_$RF_NUM") 'BEGIN{FS=SEP}{if(NR==START){for(i=COL_START;i<=NF;i++){print $i}}}' < $RESULTS_FILE_1) | tr "\n" "\t" | head -c -1)
+		#Advance the merge line pointers
+		temp=$(eval echo -e "\$MERGE_LINE_$RF_NUM")
+		((temp++))
+		eval MERGE_LINE_$RF_NUM=$temp
+	done
+	#After merge points have been totalled add them to output string and print
+	#Average timestamp
+	TIMESTAMP_AVG=$(echo "scale=0; $TIMESTAMP_TOTAL/$RF_NUM;" | bc )
+	#Average power
+	POWER_AVG=$(echo "scale=3; $POWER_TOTAL/$RF_NUM;" | bc )
+	#Average cpu cycles
+	CCYCLES_AVG=$(echo "scale=0; $CCYCLES_TOTAL/$RF_NUM;" | bc )
+	#Average temp
+	TEMP_AVG=$(echo "scale=0; $TEMP_TOTAL/$RF_NUM;" | bc )
+	#Average volt
+	VOLT_AVG=$(echo "scale=1; $VOLT_TOTAL/$RF_NUM;" | bc )
+	#Average curr
+	CURR_AVG=$(echo "scale=3; $CURR_TOTAL/$RF_NUM;" | bc )
+	#Output data
+	if [[ -z $SAVE_FILE ]]; then
+		echo -e "$TIMESTAMP_AVG\t$MAIN_BENCH\t$MAIN_RUN\t$MAIN_FREQ\t$TEMP_AVG\t$VOLT_AVG\t$CURR_AVG\t$POWER_AVG\t$CCYCLES_AVG\t$EVENTS_TOTAL" >&1
+	else
+		echo -e "$TIMESTAMP_AVG\t$MAIN_BENCH\t$MAIN_RUN\t$MAIN_FREQ\t$TEMP_AVG\t$VOLT_AVG\t$CURR_AVG\t$POWER_AVG\t$CCYCLES_AVG\t$EVENTS_TOTAL" > $SAVE_FILE
+	fi
+	#Advance the main line pointers
+	((MAIN_LINE++))
+done 
 
-
-
-
-
+echo -e "====================" >&1
 echo "Script Done!" >&1
 echo -e "====================" >&1
