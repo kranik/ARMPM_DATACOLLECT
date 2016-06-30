@@ -465,21 +465,26 @@ do
 		echo -e "$EVENTS_LIST_TEMP -> $EVENTS_LIST_TEMP_LABELS" >&1
 		#Uses temporary files generated for extracting the train and test set. Array indexing starts at 1 in awk.
 		#Also uses the extracted benchmark set files to pass arguments in octave since I found that to be the easiest way and quickest for bug checking.
+		#Sometimes octave bugs out and does not accept input correctly resulting in missing frequencies.
+		#I overcome that with a while loop which checks if we have collected data for all frequencies, if not repeat
+		#This bug is totally random and the only way to overcome it is to check and repeat (1 in every 5-6 times is faulty)
+		#What causes this is too many quick consequent inputs to octave, sometimes it goes haywire.
+		unset -v data_count				
 		if [[ -n $ALL_FREQUENCY ]]; then
-			#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
-			#Split data and collect output, then cleanup
-			touch "train_set.data" "test_set.data"
-			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
-			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
-			octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST_TEMP')" 2> /dev/null)
-			rm "train_set.data" "test_set.data"
+			while [[ $data_count -ne 1 ]]
+			do
+				#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
+				#Split data and collect output, then cleanup
+				touch "train_set.data" "test_set.data"
+				awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+				awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
+				octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST_TEMP')" 2> /dev/null)
+				rm "train_set.data" "test_set.data"
+				data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
+			done
 		else
 			#If per-frequency models, split benchmarks for each freqeuncy (with cleanup so we get fresh split every frequency)
-			#Then pass onto octave and store results in a concatenating string
-			#Sometimes octave bugs out and does not accept input correctly resulting in missing frequencies.
-			#I overcome that with a while loop which checks if we have collected data for all frequencies, if not repeat
-			#This bug is totally random and the only way to overcome it is to check and repeat (1 in every 5-6 times is faulty)	
-			unset -v data_count
+			#Then pass onto octave and store results in a concatenating string	
 			while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
 			do
 				unset -v octave_output				
@@ -599,14 +604,22 @@ echo -e "====================" >&1
 #This part is for outputing a specified events list or just using the automatically generated one and passing it onto octave
 #Anyhow its mandatory to extract results so its always executed even if we skip automatic generation
 #Its the same as the automatic generation collection logic, except for the all the automatic iteration, we just use one events list with octave
+unset -v data_count				
 if [[ -n $ALL_FREQUENCY ]]; then
-	touch "train_set.data" "test_set.data"
-	awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
-	awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
-	octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
-	rm "train_set.data" "test_set.data"
+	while [[ $data_count -ne 1 ]]
+	do
+		#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
+		#Split data and collect output, then cleanup
+		touch "train_set.data" "test_set.data"
+		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
+		octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
+		rm "train_set.data" "test_set.data"
+		data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
+	done
 else
-	unset -v data_count	
+	#If per-frequency models, split benchmarks for each freqeuncy (with cleanup so we get fresh split every frequency)
+	#Then pass onto octave and store results in a concatenating string	
 	while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
 	do
 		unset -v octave_output				
