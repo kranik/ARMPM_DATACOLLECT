@@ -33,9 +33,9 @@ getMean () {
 	local -n array=$1
 	for i in `seq 0 $(($2-1))`
 	do
-		total=$(echo "scale = 2; $total+${array[$i]};" | bc )
+		total=$(echo "$total+${array[$i]};" | bc )
 	done
-	echo $(echo "scale=2; $total/$2;" | bc )
+	echo $(echo "scale=5; $total/$2;" | bc )
 }
 
 #requires getops, but this should not be an issue since ints built in bash
