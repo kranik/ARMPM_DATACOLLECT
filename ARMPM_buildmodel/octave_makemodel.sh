@@ -6,6 +6,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 #Internal variable for quickly setting maximum number of modes and model types
+NUM_AUTO=2
 NUM_MODES=3
 NUM_TYPES=2
 
@@ -39,7 +40,7 @@ getMean () {
 }
 
 #requires getops, but this should not be an issue since ints built in bash
-while getopts ":r:f:b:s:m:t:c:e:n:hac" opt;
+while getopts ":r:f:b:s:m:t:c:e:n:l:hac" opt;
 do
 	case $opt in
 		h)
@@ -52,6 +53,7 @@ do
 			echo "-e [NUMBER LIST] -> Specify events list." >&1
 			echo "-n [NUMBER] -> Specify max number of events to include in automatic model generation." >&1
 			echo "-a -> Use flag to specify all frequencies model instead of per frequency one." >&1
+			echo "-l [NUMBER: 1:$NUM_AUTO]-> Type of automatic machine learning search approach: 1 -> Bottom-up; 2 -> Top-down;" >&1
 			echo "-m [NUMBER: 1:$NUM_MODES]-> Mode of operation: 1 -> Measured physical data, full model performance and model coefficients; 2 -> Measured physical data and model performance; 3 -> Model performance;" >&1
 			echo "-t [NUMBER: 1:$NUM_TYPES]-> Type of model: 1 -> Minimal absolute error; 2 -> Minimal absolute error standart deviation;" >&1
 			echo "Mandatory options are: -r, -b, -c, -e, -m, -t"
@@ -198,6 +200,23 @@ do
 		    		SAVE_FILE="$OPTARG"
 			fi
 			;;
+		l)
+			if [[ -n $AUTO_SEARCH ]]; then
+		    		echo "Invalid input: option -l has already been used!" >&2
+		    		exit 1                
+			fi
+			if [[ -z $NUM_MODEL_EVENTS ]]; then
+				echo "Please specify the number of events in model before you select the automatic search algorithm!" >&2
+				exit 1
+			fi
+			if [[ $OPTARG != "1" && $OPTARG != "2" ]]; then 
+				echo "Invalid operarion: -l $AUTO_SEARCH! Options are: [1:$NUM_AUTO]." >&2
+				echo "Use -h flag for more information on the available automatic search algorithms." >&2
+			    	echo -e "===================="
+			    	exit 1
+			fi		
+			AUTO_SEARCH="$OPTARG"      	
+			;;
 		m)
 			if [[ -n $MODE ]]; then
 		    		echo "Invalid input: option -m has already been used!" >&2
@@ -218,7 +237,7 @@ do
 			fi
 			if [[ $OPTARG != "1" && $OPTARG != "2" ]]; then 
 				echo "Invalid operarion: -t $MODEL_TYPE! Options are: [1:$NUM_TYPES]." >&2
-				echo "Use -h flag for more information on the available modes." >&2
+				echo "Use -h flag for more information on the available model types." >&2
 			    	echo -e "===================="
 			    	exit 1
 			fi		
@@ -345,6 +364,11 @@ if [[ -z $EVENTS_LIST && -z $EVENTS_POOL ]]; then
     	echo -e "====================" >&1
     	exit 1
 fi
+if [[ -n $NUM_MODEL_EVENTS && -z $AUTO_SEARCH ]]; then
+    	echo "No automatic search algorithm specified! Expected -l flag." >&2
+    	echo -e "====================" >&1
+    	exit 1
+fi
 echo -e "Critical checks passed!"  >&1
 
 #Regular sanity checks
@@ -411,6 +435,17 @@ case $MODEL_TYPE in
 		;;
 esac
 echo -e "--------------------" >&1
+#Automatic search algorithm sanity checks
+echo "Specified model type:" >&1
+case $AUTO_SEARCH in
+	1)
+		echo "$AUTO_SEARCH -> Use bottom-up approach. Heuristically add events until we cannot improve model or we reach limit -> $NUM_MODEL_EVENTS" >&1
+		;;
+	2) 
+		echo "$AUTO_SEARCH -> Use top-down approach. Heuristically remove events until we cannot improve model or we reach limit -> $NUM_MODEL_EVENTS" >&1
+		;;
+esac
+echo -e "--------------------" >&1
 #Events sanity checks
 echo -e "Regressand Column:" >&1
 echo "$REGRESSAND_COL -> $REGRESSAND_LABEL" >&1
@@ -422,10 +457,10 @@ if [[ -z $NUM_MODEL_EVENTS ]]; then
 	echo -e "Events list:" >&1
 	echo "$EVENTS_LIST -> $EVENTS_LIST_LABELS" >&1
 	NUM_MODEL_EVENTS=0
-else
-	EVENTS_POOL_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+else	
 	echo "Using user specified maximum number of events for automatic generation -> $NUM_MODEL_EVENTS" >&1
 	echo -e "--------------------" >&1
+	EVENTS_POOL_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
 	echo -e "Events pool:" >&1
 	echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
 fi
@@ -437,11 +472,95 @@ else
 	echo "Using user specified output save file -> $SAVE_FILE" >&1
 fi
 echo -e "--------------------" >&1
+
+
+#Trim constant events from events pool
+if [[ -n $NUM_MODEL_EVENTS ]]; then
+	echo -e "====================" >&1
+	echo -e "--------------------" >&1
+	echo -e "Removing constant events." >&1
+	echo -e "Current events used:" >&1
+	echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
+	echo -e "--------------------" >&1
+	spaced_POOL="${EVENTS_POOL//,/ }"
+	for EV_TEMP in $spaced_POOL
+	do
+		#Initiate temp event list to collect results for
+		echo -e "********************" >&1
+		EV_TEMP_LABEL=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COL=$EV_TEMP 'BEGIN{FS=SEP}{if(NR==START){ print $COL; exit } }' < $RESULTS_FILE)
+		echo "Checking event:" >&1
+		echo -e "$EV_TEMP -> $EV_TEMP_LABEL" >&1
+		unset -v data_count				
+		if [[ -n $ALL_FREQUENCY ]]; then
+			while [[ $data_count -ne 1 ]]
+			do
+				#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
+				#Split data and collect output, then cleanup
+				touch "train_set.data" "test_set.data"
+				awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+				awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
+				octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EV_TEMP')" 2> /dev/null)
+				rm "train_set.data" "test_set.data"
+				data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
+			done
+		else
+			#If per-frequency models, split benchmarks for each freqeuncy (with cleanup so we get fresh split every frequency)
+			#Then pass onto octave and store results in a concatenating string	
+			while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
+			do
+				unset -v octave_output				
+				for count in `seq 0 $((${#FREQ_LIST[@]}-1))`
+				do
+					touch "train_set.data" "test_set.data"
+					awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+					awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
+					octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EV_TEMP')" 2> /dev/null)
+					rm "train_set.data" "test_set.data"
+				done
+				data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
+			done	
+		fi
+		#Analyse collected results
+		#Avg. Rel. Error
+		IFS=";" read -a rel_avg_abs_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
+		#Rel. Err. Std. Dev
+		IFS=";" read -a rel_avg_abs_err_std_dev <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)
+		#Check for bad events
+		if [[ " ${rel_avg_abs_err[@]} " =~ " Inf " ]]; then
+			#If relative error contains infinity then event is bad for linear regression as is removed from list
+			EVENTS_POOL=$(echo $EVENTS_POOL | sed "s/^$EV_TEMP,//g;s/,$EV_TEMP,/,/g;s/,$EV_TEMP$//g;s/^$EV_TEMP$//g")
+			EVENTS_POOL_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+			echo "Bad Event (constant)!" >&1
+			echo "Removed from events pool." >&1
+			echo -e "********************" >&1
+			if [[ $EVENTS_POOL !=  "\n" ]]; then
+				echo "New events pool:" >&1
+				echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
+			else
+				echo "New events pool -> (empty)" >&1
+				echo "Program cannot continue with an empty events pool." >&1
+				echo "Please use non-constant events for model generation." >&1
+				exit
+			fi
+			echo -e "********************" >&1
+		fi 
+	done
+	#Print final events pool
+	echo -e "--------------------" >&1
+	echo -e "Final events to be used in automatic generation:" >&1
+	EVENTS_POOL_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+	echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
+	echo -e "--------------------" >&1
+	echo -e "====================" >&1
+fi
+
 #Automatic model generation.
 #It will keep going as long as we have not saturated the model (no further events contribute) or we reach max number of model events as specified by user
 #If we dont want automatic we just initialise NUM_MODEL_EVENTS to 0 and skip this loop. EZPZ
-echo -e "====================" >&1
-while [[ $NUM_MODEL_EVENTS -gt 0 ]]
+echo -e "Begin automatic model generation:" >&1
+
+#Bottom-up approach
+while [[ $NUM_MODEL_EVENTS -gt 0 && $AUTO_SEARCH == 1 ]]
 do
 	spaced_POOL="${EVENTS_POOL//,/ }"
 	echo -e "--------------------" >&1
@@ -504,49 +623,42 @@ do
 		IFS=";" read -a rel_avg_abs_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
 		#Rel. Err. Std. Dev
 		IFS=";" read -a rel_avg_abs_err_std_dev <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)
-		#Check for bad events
-		if [[ " ${rel_avg_abs_err[@]} " =~ " Inf " ]]; then
-			#If relative error contains infinity then event is bad for linear regression as is removed from list
-			EVENTS_POOL=$(echo $EVENTS_POOL | sed "s/^$EV_TEMP,//g;s/,$EV_TEMP,/,/g;s/,$EV_TEMP$//g;s/^$EV_TEMP$//g")
-			echo "Bad Event (constant)!" >&1
-			echo "Removed from events pool." >&1
-		else
-			#Get the means for both relative error and standart deviation and output
-			#Depending oon type though we use a different value for EVENTS_LIST_NEW to try and minmise
-			MEAN_REL_AVG_ABS_ERR=$(getMean rel_avg_abs_err ${#rel_avg_abs_err[@]} )
-			MEAN_REL_AVG_ABS_ERR_STD_DEV=$(getMean rel_avg_abs_err_std_dev ${#rel_avg_abs_err_std_dev[@]} )
-			echo "Mean model relative error -> $MEAN_REL_AVG_ABS_ERR" >&1
-			echo "Mean model relative error stdandart deviation -> $MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
-			case $MODEL_TYPE in
-			1)
-				EVENTS_LIST_NEW=$MEAN_REL_AVG_ABS_ERR
-				;;
-			2)
-				EVENTS_LIST_NEW=$MEAN_REL_AVG_ABS_ERR_STD_DEV
-				;;
-			esac
-			if [[ -n $EVENTS_LIST_MIN ]]; then
-				#If events list exits then compare new value and if smaller then store else just move along the events list 
-				if [[ $(echo "$EVENTS_LIST_NEW < $EVENTS_LIST_MIN" | bc -l) -eq 1 ]]; then
-					#Update events list error and EV
-					echo "Good event (improves minimum temporary model)! Using as new minimum!"
-					EV_ADD=$EV_TEMP
-					EVENTS_LIST_MIN=$EVENTS_LIST_NEW
-					EVENTS_LIST_MEAN_REL_AVG_ABS_ERR=$MEAN_REL_AVG_ABS_ERR
-					EVENTS_LIST_MEAN_REL_AVG_ABS_ERR_STD_DEV=$MEAN_REL_AVG_ABS_ERR_STD_DEV
-				else
-					echo "Bad event (does not improve minimum temporary model)!" >&1
-				fi
-			else
-				#If no event list temp error present this means its the first event to check. Just add it as a new minimum
+		#Get the means for both relative error and standart deviation and output
+		#Depending oon type though we use a different value for EVENTS_LIST_NEW to try and minmise
+		MEAN_REL_AVG_ABS_ERR=$(getMean rel_avg_abs_err ${#rel_avg_abs_err[@]} )
+		MEAN_REL_AVG_ABS_ERR_STD_DEV=$(getMean rel_avg_abs_err_std_dev ${#rel_avg_abs_err_std_dev[@]} )
+		echo "Mean model relative error -> $MEAN_REL_AVG_ABS_ERR" >&1
+		echo "Mean model relative error stdandart deviation -> $MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
+		case $MODEL_TYPE in
+		1)
+			EVENTS_LIST_NEW=$MEAN_REL_AVG_ABS_ERR
+			;;
+		2)
+			EVENTS_LIST_NEW=$MEAN_REL_AVG_ABS_ERR_STD_DEV
+			;;
+		esac
+		if [[ -n $EVENTS_LIST_MIN ]]; then
+			#If events list exits then compare new value and if smaller then store else just move along the events list 
+			if [[ $(echo "$EVENTS_LIST_NEW < $EVENTS_LIST_MIN" | bc -l) -eq 1 ]]; then
+				#Update events list error and EV
+				echo "Good event (improves minimum temporary model)! Using as new minimum!"
+				EV_ADD=$EV_TEMP
 				EVENTS_LIST_MIN=$EVENTS_LIST_NEW
 				EVENTS_LIST_MEAN_REL_AVG_ABS_ERR=$MEAN_REL_AVG_ABS_ERR
 				EVENTS_LIST_MEAN_REL_AVG_ABS_ERR_STD_DEV=$MEAN_REL_AVG_ABS_ERR_STD_DEV
-				EV_ADD=$EV_TEMP
-				echo "Good event (first event in model)!" >&1
+			else
+				echo "Bad event (does not improve minimum temporary model)!" >&1
 			fi
-		fi 
+		else
+			#If no event list temp error present this means its the first event to check. Just add it as a new minimum
+			EVENTS_LIST_MIN=$EVENTS_LIST_NEW
+			EVENTS_LIST_MEAN_REL_AVG_ABS_ERR=$MEAN_REL_AVG_ABS_ERR
+			EVENTS_LIST_MEAN_REL_AVG_ABS_ERR_STD_DEV=$MEAN_REL_AVG_ABS_ERR_STD_DEV
+			EV_ADD=$EV_TEMP
+			echo "Good event (first event in model)!" >&1
+		fi
 	done
+
 	echo -e "********************" >&1
 	echo "All events checked!" >&1
 	echo -e "********************" >&1
@@ -595,6 +707,162 @@ do
 		break
 	fi
 done
+
+#Top-down approach
+while [[ $(echo $EVENTS_POOL | tr "," "\n" | wc -l) -gt $NUM_MODEL_EVENTS && $AUTO_SEARCH == 2 ]]
+do
+	echo -e "--------------------" >&1
+	echo -e "Current events pool:" >&1
+	echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
+	#Compute events list error and store as new max
+	echo -e "--------------------" >&1
+	unset -v data_count				
+	if [[ -n $ALL_FREQUENCY ]]; then
+		while [[ $data_count -ne 1 ]]
+		do
+			touch "train_set.data" "test_set.data"
+			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
+			octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_POOL')" 2> /dev/null)
+			rm "train_set.data" "test_set.data"
+			data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
+		done
+	else	
+		while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
+		do
+			unset -v octave_output				
+			for count in `seq 0 $((${#FREQ_LIST[@]}-1))`
+			do
+				touch "train_set.data" "test_set.data"
+				awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+				awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
+				octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_POOL')" 2> /dev/null)
+				rm "train_set.data" "test_set.data"
+			done
+			data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
+		done	
+	fi
+	IFS=";" read -a rel_avg_abs_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
+	IFS=";" read -a rel_avg_abs_err_std_dev <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)
+	EVENTS_POOL_MEAN_REL_AVG_ABS_ERR=$(getMean rel_avg_abs_err ${#rel_avg_abs_err[@]} )
+	EVENTS_POOL_MEAN_REL_AVG_ABS_ERR_STD_DEV=$(getMean rel_avg_abs_err_std_dev ${#rel_avg_abs_err_std_dev[@]} )
+	echo "Mean model relative error -> $EVENTS_POOL_MEAN_REL_AVG_ABS_ERR" >&1
+	echo "Mean model relative error stdandart deviation -> $EVENTS_POOL_MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
+	case $MODEL_TYPE in
+	1)
+		EVENTS_POOL_MIN=$EVENTS_POOL_MEAN_REL_AVG_ABS_ERR
+		;;
+	2)
+		EVENTS_POOL_MIN=$EVENTS_POOL_MEAN_REL_AVG_ABS_ERR_STD_DEV
+		;;
+	esac
+
+	#Start top-down by spacing the pool and iterating the events
+	spaced_POOL="${EVENTS_POOL//,/ }"
+	for EV_TEMP in $spaced_POOL
+	do
+		#Initiate temp event list
+		#Trim the event which has the highest error
+		EVENTS_POOL_TEMP=$(echo $EVENTS_POOL | sed "s/^$EV_TEMP,//g;s/,$EV_TEMP,/,/g;s/,$EV_TEMP$//g;s/^$EV_TEMP$//g")
+		EV_TEMP_LABEL=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COL=$EV_TEMP 'BEGIN{FS=SEP}{if(NR==START){ print $COL; exit } }' < $RESULTS_FILE)
+		EVENTS_POOL_TEMP_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL_TEMP" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+		echo -e "********************" >&1
+		echo "Checking event:" >&1
+		echo -e "$EV_TEMP -> $EV_TEMP_LABEL" >&1
+		echo "Temporaty events list:"
+		echo -e "$EVENTS_POOL_TEMP -> $EVENTS_POOL_TEMP_LABELS" >&1
+		unset -v data_count				
+		if [[ -n $ALL_FREQUENCY ]]; then
+			while [[ $data_count -ne 1 ]]
+			do
+				touch "train_set.data" "test_set.data"
+				awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+				awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
+				octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_POOL_TEMP')" 2> /dev/null)
+				rm "train_set.data" "test_set.data"
+				data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
+			done
+		else	
+			while [[ $data_count -ne ${#FREQ_LIST[@]} ]]
+			do
+				unset -v octave_output				
+				for count in `seq 0 $((${#FREQ_LIST[@]}-1))`
+				do
+					touch "train_set.data" "test_set.data"
+					awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+					awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
+					octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_POOL_TEMP')" 2> /dev/null)
+					rm "train_set.data" "test_set.data"
+				done
+				data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
+			done	
+		fi
+		IFS=";" read -a rel_avg_abs_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Average" && $2=="Relative" && $3=="Error"){ print $5 }}' ) | tr "\n" ";" | head -c -1)
+		IFS=";" read -a rel_avg_abs_err_std_dev <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)
+		MEAN_REL_AVG_ABS_ERR=$(getMean rel_avg_abs_err ${#rel_avg_abs_err[@]} )
+		MEAN_REL_AVG_ABS_ERR_STD_DEV=$(getMean rel_avg_abs_err_std_dev ${#rel_avg_abs_err_std_dev[@]} )
+		echo "Mean model relative error -> $MEAN_REL_AVG_ABS_ERR" >&1
+		echo "Mean model relative error stdandart deviation -> $MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
+		case $MODEL_TYPE in
+		1)
+			EVENTS_POOL_NEW=$MEAN_REL_AVG_ABS_ERR
+			;;
+		2)
+			EVENTS_POOL_NEW=$MEAN_REL_AVG_ABS_ERR_STD_DEV
+			;;
+		esac
+		if [[ $(echo "$EVENTS_POOL_NEW < $EVENTS_POOL_MIN" | bc -l) -eq 1 ]]; then
+			#Update events list error and EV
+			echo "Removing causes best improvement to temporary model! Using as new minimum!"
+			EV_REMOVE=$EV_TEMP
+			EVENTS_POOL_MIN=$EVENTS_POOL_NEW
+			EVENTS_POOL_MEAN_REL_AVG_ABS_ERR=$MEAN_REL_AVG_ABS_ERR
+			EVENTS_POOL_MEAN_REL_AVG_ABS_ERR_STD_DEV=$MEAN_REL_AVG_ABS_ERR_STD_DEV
+		else
+			echo "Removing event does not improve temporary model!" >&1
+		fi
+	done
+
+	echo -e "********************" >&1
+	echo "All events checked!" >&1
+	echo -e "********************" >&1
+	#Once going through all events see if we can populate events list
+	if [[ -n $EV_REMOVE ]]; then
+		#We found an new event to remove from the list
+		EVENTS_POOL=$(echo $EVENTS_POOL | sed "s/^$EV_REMOVE,//g;s/,$EV_REMOVE,/,/g;s/,$EV_REMOVE$//g;s/^$EV_REMOVE$//g")
+		EV_REMOVE_LABEL=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COL=$EV_REMOVE 'BEGIN{FS=SEP}{if(NR==START){ print $COL; exit } }' < $RESULTS_FILE)
+		EVENTS_POOL_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+		#Remove from events pool
+		echo -e "--------------------" >&1
+		echo -e "********************" >&1
+		echo "Remove worst event from events list:"
+		echo "$EV_REMOVE -> $EV_REMOVE_LABEL" >&1
+		echo -e "********************" >&1
+		#reset EV_REMOVE too see if we can find another one and decrement counter
+		unset -v EV_REMOVE
+	else
+		EVENTS_POOL_SIZE=$(echo $EVENTS_POOL | tr "," "\n" | wc -l)
+		EVENTS_POOL_LABELS=$((awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COLUMNS="$EVENTS_POOL" 'BEGIN{FS = SEP;len=split(COLUMNS,ARRAY,",")}{if (NR == START){for (i = 1; i <= len; i++){print $ARRAY[i]}}}' < $RESULTS_FILE) | tr "\n" "," | head -c -1)
+		#We did not find a new event to remove from list. Just output and break loop (list saturated)		
+		echo -e "--------------------" >&1
+		echo "No new improving event found. Events list minimised at $EVENTS_POOL_SIZE events." >&1
+		echo -e "--------------------" >&1
+		echo -e "====================" >&1
+		echo -e "Optimal events list found:" >&1
+		echo "$EVENTS_POOL -> $EVENTS_POOL_LABELS" >&1
+		echo -e "Events list mean model relative error -> $EVENTS_POOL_MEAN_REL_AVG_ABS_ERR" >&1
+		echo -e "Events list mean model relative error stdandart deviation -> $EVENTS_POOL_MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
+		echo -e "Using final list in full model analysis." >&1
+		echo -e "====================" >&1
+		break
+	fi
+done
+
+#Update the events list if used top-down automatic search
+if [[ $AUTO_SEARCH == 2 ]]; then
+	EVENTS_LIST=$EVENTS_POOL
+	EVENTS_LIST_LABELS=$EVENTS_POOL_LABELS
+fi
 
 echo -e "====================" >&1
 echo -e "Using events list:" >&1
