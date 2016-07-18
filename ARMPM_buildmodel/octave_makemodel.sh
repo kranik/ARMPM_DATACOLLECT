@@ -344,11 +344,6 @@ if [[ -z $MODE ]]; then
     	echo -e "====================" >&1
     	exit 1
 fi
-if [[ -z $MODEL_TYPE ]]; then
-    	echo "No model type specified! Expected -t flag." >&2
-    	echo -e "====================" >&1
-    	exit 1
-fi
 if [[ -z $BENCH_FILE ]]; then
 	echo "No benchmark file specified! Please use flag with existing file or an empty file to gererate random benchmark split." >&2
 	echo -e "====================" >&1
@@ -366,6 +361,11 @@ if [[ -z $EVENTS_LIST && -z $EVENTS_POOL ]]; then
 fi
 if [[ -n $NUM_MODEL_EVENTS && -z $AUTO_SEARCH ]]; then
     	echo "No automatic search algorithm specified! Expected -l flag." >&2
+    	echo -e "====================" >&1
+    	exit 1
+fi
+if [[ -n $NUM_MODEL_EVENTS && -z $MODEL_TYPE ]]; then
+    	echo "No model type specified! Expected -t flag." >&2
     	echo -e "====================" >&1
     	exit 1
 fi
@@ -1043,7 +1043,8 @@ IFS=";" read -a rel_avg_abs_err <<< $((echo "$octave_output" | awk -v SEP=' ' 'B
 IFS=";" read -a rel_avg_abs_err_std_dev <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Relative" && $2=="Error" && $3=="Standart" && $4=="Deviation"){ print $6 }}' ) | tr "\n" ";" | head -c -1)
 #Model coefficients
 IFS=";" read -a model_coeff <<< $((echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP}{if ($1=="Model" && $2=="coefficients:"){ print substr($0, index($0,$3)) }}' ) | tr "\n" ";" | head -c -1)
-
+MEAN_REL_AVG_ABS_ERR=$(getMean rel_avg_abs_err ${#rel_avg_abs_err[@]} )
+MEAN_REL_AVG_ABS_ERR_STD_DEV=$(getMean rel_avg_abs_err_std_dev ${#rel_avg_abs_err_std_dev[@]} )
 #Modify freqeuncy list first element to list "all"
 [[ -n $ALL_FREQUENCY ]] && FREQ_LIST[0]=$(echo "all")
 #Adjust output depending on mode  	
@@ -1083,6 +1084,9 @@ do
 	#If all freqeuncy model, there is just one line that needs to be printed
 	[[ -n $ALL_FREQUENCY ]] && break;
 done
+echo -e "--------------------" >&1
+echo "Mean model relative error -> $MEAN_REL_AVG_ABS_ERR" >&1
+echo "Mean model relative error stdandart deviation -> $MEAN_REL_AVG_ABS_ERR_STD_DEV" >&1
 echo -e "--------------------" >&1
 echo -e "====================" >&1
 echo "Script Done!" >&1
