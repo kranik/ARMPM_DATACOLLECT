@@ -277,6 +277,8 @@ do
 done
 
 echo "Sanity check."
+cpufreq-set -d 2000000 -u 2000000 -c 4
+cpufreq-set -d 1400000 -u 1400000 -c 0
 cpufreq-info
 cset shield
 
@@ -323,7 +325,7 @@ do
 	done
 done
 echo "Returning environment to previous state"
-for i in `seq 0 7`
+for i in ${CORE_HOTPLUG//,/ }
 do
 	echo 1 > "/sys/devices/system/cpu/cpu$i/online"
 done
