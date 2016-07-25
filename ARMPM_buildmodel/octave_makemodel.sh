@@ -7,7 +7,7 @@ fi
 
 #Internal variable for quickly setting maximum number of modes and model types
 NUM_AUTO=3
-NUM_MODES=3
+NUM_MODES=5
 NUM_TYPES=2
 
 #Extract unique benchmark split from results file
@@ -54,7 +54,7 @@ do
 			echo "-n [NUMBER] -> Specify max number of events to include in automatic model generation." >&1
 			echo "-a -> Use flag to specify all frequencies model instead of per frequency one." >&1
 			echo "-l [NUMBER: 1:$NUM_AUTO]-> Type of automatic machine learning search approach: 1 -> Bottom-up; 2 -> Top-down; 3 -> Exhaustive search;" >&1
-			echo "-m [NUMBER: 1:$NUM_MODES]-> Mode of operation: 1 -> Measured physical data, full model performance and model coefficients; 2 -> Measured physical data and model performance; 3 -> Model performance;" >&1
+			echo "-m [NUMBER: 1:$NUM_MODES]-> Mode of operation: 1 -> Measured physical data, full model performance and model coefficients; 2 -> Measured physical data and model performance; 3 -> Model performance; 4 -> Platform physical information; 5 -> Platform measured power;" >&1
 			echo "-t [NUMBER: 1:$NUM_TYPES]-> Type of model: 1 -> Minimal absolute error; 2 -> Minimal absolute error standart deviation;" >&1
 			echo "Mandatory options are: -r, -b, -c, -e, -m, -t"
 			exit 0 
@@ -222,7 +222,7 @@ do
 		    		echo "Invalid input: option -m has already been used!" >&2
 		    		exit 1                
 			fi
-			if [[ $OPTARG != "1" && $OPTARG != "2" && $OPTARG != "3" ]]; then 
+			if [[ $OPTARG != "1" && $OPTARG != "2" && $OPTARG != "3" && $OPTARG != "4" && $OPTARG != "5" ]]; then 
 				echo "Invalid operarion: -m $MODE! Options are: [1:$NUM_MODES]." >&2
 				echo "Use -h flag for more information on the available modes." >&2
 			    	echo -e "===================="
@@ -421,6 +421,12 @@ case $MODE in
 		;;
 	3) 
 		echo "$MODE -> Full model performance." >&1
+		;;
+	4) 
+		echo "$MODE -> Platform physical information." >&1
+		;;
+	5) 
+		echo "$MODE -> Platform measured power." >&1
 		;;
 esac
 echo -e "--------------------" >&1
@@ -1061,6 +1067,14 @@ case $MODE in
 	3)
 		HEADER="Average Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]"
 		DATA="\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}"
+		;;
+	4)
+		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]"
+		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}"
+		;;
+	5)
+		HEADER="Average Power [W]\tMeasured Power Range [%]"
+		DATA="\${avg_pow[\$i]}\t\${pow_range[\$i]}"
 		;;
 esac  
 
