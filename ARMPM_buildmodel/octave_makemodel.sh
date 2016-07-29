@@ -4,6 +4,8 @@ if [[ "$#" -eq 0 ]]; then
 	echo "This program requires inputs. Type -h for help." >&2
 	exit 1
 fi
+#Internal parameters
+TIME_CONVERT=1000000000
 
 #Internal variable for quickly setting maximum number of modes and model types
 NUM_AUTO=3
@@ -254,8 +256,8 @@ do
 			fi
 			#Extract events columns from results file
 			EVENTS_COL_START=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) 'BEGIN{FS=SEP}{if(NR==START){ for(i=1;i<=NF;i++){ if($i ~ /Run/) { print i+1; exit} } } }' < $RESULTS_FILE)
-			EVENTS_COL_END=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) 'BEGIN{FS=SEP}{if(NR==START){ print NF; exit } }' < $RESULTS_FILE)
-			
+			EVENTS_COL_END=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) 'BEGIN{FS=SEP}{if(NR==START){ print NF; exit } }' < $RESULTS_FILE)				
+	
 			#Check if regressand is within bounds
 			if [[ "$OPTARG" -gt $EVENTS_COL_END || "$OPTARG" -lt $EVENTS_COL_START ]]; then 
 				echo "Selected regressand -c $OPTARG is out of bounds/invalid. Needs to be an integer value betweeen [$EVENTS_COL_START:$EVENTS_COL_END]." >&2
@@ -1009,6 +1011,24 @@ if [[ -n $ALL_FREQUENCY ]]; then
 		touch "train_set.data" "test_set.data"
 		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
+		#Collect runtime information
+		#We need to average runtime per-frequency per run so we add per run runtimes then average
+		#Extract number of runs from last line of test set file
+		bench_runs=$(awk -v START=$(wc -l "test_set.data" | awk '{print $1}') -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) 'BEGIN{FS = SEP}{if (NR == START){print $COL;exit}}' < "test_set.data")
+		#Extract runtime per run (converted to seconds) and add to total. Use results file to get 
+		total_runtime=0
+		for runnum in `seq 1 $bench_runs`
+		do
+			#search file to find first data collection of run -> start
+			runtime_st=$(awk -v START=$RESULTS_START_LINE -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) -v DATA=$runnum 'BEGIN{FS = SEP}{if (NR >= START && $COL == DATA){print $1;exit}}' < $RESULTS_FILE)
+			#search file in reverse to find the last sensor collection of run -> end
+			runtime_nd=$(tac $RESULTS_FILE | awk -v START=1 -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) -v DATA=$runnum 'BEGIN{FS = SEP}{if (NR >= START && $COL == DATA){print $1;exit}}')
+			#Add run runtime to total runtime
+			total_runtime=$(echo "scale=0;$total_runtime+($runtime_nd-$runtime_st);" | bc )
+		done
+		#Compute average full freq runtime
+		avg_total_runtime[0]=$(echo "scale=0;$total_runtime/($bench_runs*$TIME_CONVERT);" | bc )
+		#Collect octave output
 		octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
 		rm "train_set.data" "test_set.data"
 		data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
@@ -1024,6 +1044,22 @@ else
 			touch "train_set.data" "test_set.data"
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
+			bench_runs=$(awk -v START=$(wc -l "test_set.data" | awk '{print $1}') -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) 'BEGIN{FS = SEP}{if (NR == START){print $COL;exit}}' < "test_set.data")
+			total_runtime=0
+			for runnum in `seq 1 $bench_runs`
+			do
+				runtime_st=$(awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v COL=$(($EVENTS_COL_START-1)) -v DATA=$runnum 'BEGIN{FS = SEP}{if (NR >= START && $COL == DATA && $4 == FREQ){print $1;exit}}' < $RESULTS_FILE)
+				#Use previous line timestamp (so this is reverse which means the next sensor reading) as final timestamp
+				runtime_nd_nr=$(tac $RESULTS_FILE | awk -v START=1 -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v COL=$(($EVENTS_COL_START-1)) -v DATA=$runnum 'BEGIN{FS = SEP}{if (NR >= START && $COL == DATA && $4 == FREQ){print NR;exit}}')
+				#If we are at the last (first in reverse) line, then increment to avoid going out of bounds when decrementing the line for the runtime_nd extraction
+				if [[ $runtime_nd_nr == 1 ]];then
+					runtime_nd_nr=$(echo "$runtime_nd_nr+1;" | bc )
+				fi
+				runtime_nd=$(tac $RESULTS_FILE | awk -v START=$(($runtime_nd_nr-1)) -v SEP='\t' 'BEGIN{FS = SEP}{if (NR == START){print $1;exit}}')
+				total_runtime=$(echo "scale=0;$total_runtime+($runtime_nd-$runtime_st);" | bc )
+			done
+			#Compute average per-freq runtime
+			avg_total_runtime[$count]=$(echo "scale=0;$total_runtime/($bench_runs*$TIME_CONVERT);" | bc )
 			octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
 			rm "train_set.data" "test_set.data"
 		done
@@ -1057,20 +1093,20 @@ MEAN_REL_AVG_ABS_ERR_STD_DEV=$(getMean rel_avg_abs_err_std_dev ${#rel_avg_abs_er
 #I store the varaible references as special characters in the DATA string then eval to evoke subsittution. Eliminates repetitive code.
 case $MODE in
 	1)
-		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]\tModel coefficients"
-		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}\t\${model_coeff[\$i]}"
+		HEADER="CPU Frequency\tTotal Runtime [s]\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]\tModel coefficients"
+		DATA="\${FREQ_LIST[\$i]}\t\${avg_total_runtime[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}\t\${model_coeff[\$i]}"
 		;;
 	2)
-		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]"
-		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}"
+		HEADER="CPU Frequency\tTotal Runtime [s]\tAverage Power [W]\tMeasured Power Range [%]\tAverage Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]"
+		DATA="\${FREQ_LIST[\$i]}\t\${avg_total_runtime[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}\t\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}"
 		;;
 	3)
 		HEADER="Average Predicted Power [W]\tPredicted Power Range [%]\tAverage Absolute Error [W]\tAbsolute Error Stdandart Deviation [W]\tAverage Relative Error [%]\tRelative Error Standart Deviation [%]"
 		DATA="\${avg_pred_pow[\$i]}\t\${pred_pow_range[\$i]}\t\${avg_abs_err[\$i]}\t\${std_dev_err[\$i]}\t\${rel_avg_abs_err[\$i]}\t\${rel_avg_abs_err_std_dev[\$i]}"
 		;;
 	4)
-		HEADER="CPU Frequency\tAverage Power [W]\tMeasured Power Range [%]"
-		DATA="\${FREQ_LIST[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}"
+		HEADER="CPU Frequency\tTotal Runtime [s]\tAverage Power [W]\tMeasured Power Range [%]"
+		DATA="\${FREQ_LIST[\$i]}\t\${avg_total_runtime[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}"
 		;;
 	5)
 		HEADER="Average Power [W]\tMeasured Power Range [%]"
@@ -1105,4 +1141,3 @@ echo -e "--------------------" >&1
 echo -e "====================" >&1
 echo "Script Done!" >&1
 echo -e "====================" >&1
-
