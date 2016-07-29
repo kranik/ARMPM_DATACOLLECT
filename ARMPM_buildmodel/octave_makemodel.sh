@@ -265,6 +265,10 @@ do
 			fi
 	    		REGRESSAND_COL="$OPTARG"
 			REGRESSAND_LABEL=$(awk -v SEP='\t' -v START=$(($RESULTS_START_LINE-1)) -v COL=$REGRESSAND_COL 'BEGIN{FS=SEP}{if(NR==START){ print $COL; exit } }' < $RESULTS_FILE)
+			#Extract run number for runtime information now that we have events column
+			BENCH_RUNS_START=$(awk -v START=$RESULTS_START_LINE -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) 'BEGIN{FS = SEP}{if (NR == START){print $COL;exit}}' < $RESULTS_FILE)
+			BENCH_RUNS_END=$(awk -v START=$(wc -l $RESULTS_FILE | awk '{print $1}') -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) 'BEGIN{FS = SEP}{if (NR == START){print $COL;exit}}' < $RESULTS_FILE)
+
 		    	;;
 		e)
 			if [[ -n  $EVENTS_LIST ]]; then
@@ -1006,18 +1010,11 @@ unset -v data_count
 if [[ -n $ALL_FREQUENCY ]]; then
 	while [[ $data_count -ne 1 ]]
 	do
-		#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
-		#Split data and collect output, then cleanup
-		touch "train_set.data" "test_set.data"
-		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
-		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
 		#Collect runtime information
 		#We need to average runtime per-frequency per run so we add per run runtimes then average
-		#Extract number of runs from last line of test set file
-		bench_runs=$(awk -v START=$(wc -l "test_set.data" | awk '{print $1}') -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) 'BEGIN{FS = SEP}{if (NR == START){print $COL;exit}}' < "test_set.data")
 		#Extract runtime per run (converted to seconds) and add to total. Use results file to get 
 		total_runtime=0
-		for runnum in `seq 1 $bench_runs`
+		for runnum in `seq $BENCH_RUNS_START 1 $BENCH_RUNS_END`
 		do
 			#search file to find first data collection of run -> start
 			runtime_st=$(awk -v START=$RESULTS_START_LINE -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) -v DATA=$runnum 'BEGIN{FS = SEP}{if (NR >= START && $COL == DATA){print $1;exit}}' < $RESULTS_FILE)
@@ -1027,7 +1024,12 @@ if [[ -n $ALL_FREQUENCY ]]; then
 			total_runtime=$(echo "scale=0;$total_runtime+($runtime_nd-$runtime_st);" | bc )
 		done
 		#Compute average full freq runtime
-		avg_total_runtime[0]=$(echo "scale=0;$total_runtime/($bench_runs*$TIME_CONVERT);" | bc )
+		avg_total_runtime[0]=$(echo "scale=0;$total_runtime/($BENCH_RUNS_END*$TIME_CONVERT);" | bc )
+		#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
+		#Split data and collect output, then cleanup
+		touch "train_set.data" "test_set.data"
+		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+		awk -v START=$RESULTS_START_LINE -v SEP='\t' -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data" 	
 		#Collect octave output
 		octave_output=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
 		rm "train_set.data" "test_set.data"
@@ -1041,12 +1043,8 @@ else
 		unset -v octave_output				
 		for count in `seq 0 $((${#FREQ_LIST[@]}-1))`
 		do
-			touch "train_set.data" "test_set.data"
-			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
-			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
-			bench_runs=$(awk -v START=$(wc -l "test_set.data" | awk '{print $1}') -v SEP='\t' -v COL=$(($EVENTS_COL_START-1)) 'BEGIN{FS = SEP}{if (NR == START){print $COL;exit}}' < "test_set.data")
 			total_runtime=0
-			for runnum in `seq 1 $bench_runs`
+			for runnum in `seq $BENCH_RUNS_START 1 $BENCH_RUNS_END`
 			do
 				runtime_st=$(awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v COL=$(($EVENTS_COL_START-1)) -v DATA=$runnum 'BEGIN{FS = SEP}{if (NR >= START && $COL == DATA && $4 == FREQ){print $1;exit}}' < $RESULTS_FILE)
 				#Use previous line timestamp (so this is reverse which means the next sensor reading) as final timestamp
@@ -1059,7 +1057,10 @@ else
 				total_runtime=$(echo "scale=0;$total_runtime+($runtime_nd-$runtime_st);" | bc )
 			done
 			#Compute average per-freq runtime
-			avg_total_runtime[$count]=$(echo "scale=0;$total_runtime/($bench_runs*$TIME_CONVERT);" | bc )
+			avg_total_runtime[$count]=$(echo "scale=0;$total_runtime/($BENCH_RUNS_END*$TIME_CONVERT);" | bc )
+			touch "train_set.data" "test_set.data"
+			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
+			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
 			octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
 			rm "train_set.data" "test_set.data"
 		done
