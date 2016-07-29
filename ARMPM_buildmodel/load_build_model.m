@@ -37,6 +37,8 @@ disp("###########################################################");
 disp("Model validation against test set");
 disp("###########################################################");
 disp(["Average Power [W]: " num2str(mean(test_power),"%.3f")]); 
+%disp(["Average Power [W]: " num2str((sum(test_power)/5),"%d")]); %Event total averaged
+%disp(["Average Power [W]: " num2str(sum(test_power),"%d")]); %Event total per run
 disp(["Measured Power Range [%]: " num2str((range(test_power)./min(test_power))*100,"%d")]);
 disp("###########################################################"); 
 disp(["Average Predicted Power [W]: " num2str(mean(pred_power),"%.3f")]);  

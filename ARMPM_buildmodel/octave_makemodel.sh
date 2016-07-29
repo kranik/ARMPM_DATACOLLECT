@@ -56,7 +56,7 @@ do
 			echo "-n [NUMBER] -> Specify max number of events to include in automatic model generation." >&1
 			echo "-a -> Use flag to specify all frequencies model instead of per frequency one." >&1
 			echo "-l [NUMBER: 1:$NUM_AUTO]-> Type of automatic machine learning search approach: 1 -> Bottom-up; 2 -> Top-down; 3 -> Exhaustive search;" >&1
-			echo "-m [NUMBER: 1:$NUM_MODES]-> Mode of operation: 1 -> Measured physical data, full model performance and model coefficients; 2 -> Measured physical data and model performance; 3 -> Model performance; 4 -> Platform physical information; 5 -> Platform measured power;" >&1
+			echo "-m [NUMBER: 1:$NUM_MODES]-> Mode of operation: 1 -> Measured physical data, full model performance and model coefficients; 2 -> Measured physical data and model performance; 3 -> Model performance; 4 -> Platform physical information; 5 -> Platform measured average regressand;" >&1
 			echo "-t [NUMBER: 1:$NUM_TYPES]-> Type of model: 1 -> Minimal absolute error; 2 -> Minimal absolute error standart deviation;" >&1
 			echo "Mandatory options are: -r, -b, -c, -e, -m, -t"
 			exit 0 
@@ -432,7 +432,7 @@ case $MODE in
 		echo "$MODE -> Platform physical information." >&1
 		;;
 	5) 
-		echo "$MODE -> Platform measured power." >&1
+		echo "$MODE -> Platform measured average regressand." >&1
 		;;
 esac
 echo -e "--------------------" >&1
@@ -1024,7 +1024,7 @@ if [[ -n $ALL_FREQUENCY ]]; then
 			total_runtime=$(echo "scale=0;$total_runtime+($runtime_nd-$runtime_st);" | bc )
 		done
 		#Compute average full freq runtime
-		avg_total_runtime[0]=$(echo "scale=0;$total_runtime/($BENCH_RUNS_END*$TIME_CONVERT);" | bc )
+		avg_total_runtime[0]=$(echo "scale=0;$total_runtime/(($BENCH_RUNS_END-$BENCH_RUNS_START+1)*$TIME_CONVERT);" | bc )
 		#If all freqeuncy model then use all freqeuncies in octave, as in use the fully populated train and test set files
 		#Split data and collect output, then cleanup
 		touch "train_set.data" "test_set.data"
@@ -1057,7 +1057,7 @@ else
 				total_runtime=$(echo "scale=0;$total_runtime+($runtime_nd-$runtime_st);" | bc )
 			done
 			#Compute average per-freq runtime
-			avg_total_runtime[$count]=$(echo "scale=0;$total_runtime/($BENCH_RUNS_END*$TIME_CONVERT);" | bc )
+			avg_total_runtime[$count]=$(echo "scale=0;$total_runtime/(($BENCH_RUNS_END-$BENCH_RUNS_START+1)*$TIME_CONVERT);" | bc )
 			touch "train_set.data" "test_set.data"
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
@@ -1110,8 +1110,8 @@ case $MODE in
 		DATA="\${FREQ_LIST[\$i]}\t\${avg_total_runtime[\$i]}\t\${avg_pow[\$i]}\t\${pow_range[\$i]}"
 		;;
 	5)
-		HEADER="Average Power [W]\tMeasured Power Range [%]"
-		DATA="\${avg_pow[\$i]}\t\${pow_range[\$i]}"
+		HEADER="Average Regressand"
+		DATA="\${avg_pow[\$i]}"
 		;;
 esac  
 
