@@ -20,6 +20,7 @@ do
 			echo "-r [DIRECTORY] -> Specify the save directory for the results of the different runs."
 			echo "-n [RUNS] -> specify list of runs to be concatenated. -n 3 for run Number 3. -n 1,3 for runs 1 and 3."
 			echo "-s [DIRECTORY] -> Specify the save directory for the concatenated results."
+			echo "-e -> Specify the inclusion of events or not (for cases where we do not hve PMU events i.e. overhead analysis)."
 			echo "Mandatory options are: ..."
 			exit 0 
         		;;
@@ -86,7 +87,7 @@ do
 			;;
 		n)
 			if [[ -n $RUNS ]]; then
-				echo "Invalid input: option -f has already been used!" >&2
+				echo "Invalid input: option -n has already been used!" >&2
 				exit 1
 			fi
 		
@@ -110,6 +111,14 @@ do
 				fi
 			done
 			;;      
+		e)
+			if [[ -n $WITH_EVENTS ]]; then
+		    		echo "Invalid input: option -e has already been used!" >&2
+		    		exit 1                
+			fi
+		    	WITH_EVENTS=1
+		    	;;           
+		
 		:)
 			echo "Option: -$OPTARG requires an argument" >&2
 			exit 1
@@ -133,8 +142,13 @@ fi
 						
 FREQ_LIST=$(ls $RESULTS_DIR/Run_${RUNS%% *} | tr " " "\n" | sort -gr | tr "\n" " ")						
 
-./process_raw_events.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
-./concatenate_results.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
+#If we have event selection enabled then process raw events and concatenated with events, else jsut concatenate sensor ata
+if [[ -n $WITH_EVENTS ]]; then
+	./process_raw_events.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
+	./concatenate_results.sh -r $RESULTS_DIR -n "${RUNS// /,}" -e -s
+else
+	./concatenate_results.sh -r $RESULTS_DIR -n "${RUNS// /,}" -s
+fi
 
 #Go into results directories and concatenate all the results files in to a big beast!
 for i in $RUNS;
@@ -146,6 +160,7 @@ do
 		BENCHMARK_NAME_COLUMN=$(awk -v SEP='\t' -v START=$(($RESULTS_BEGIN_LINE-1)) 'BEGIN{FS=SEP}{if(NR==START){ for(i=1;i<=NF;i++){ if($i ~ /Benchmark/) { print i; exit} } } }' < $RESULTS_FILE)
 		
 		TIME_BENCH_HEADER=$((awk -v SEP='\t' -v START=$(($RESULTS_BEGIN_LINE-1)) -v COL_END=$(($BENCHMARK_NAME_COLUMN+1)) 'BEGIN{FS=SEP}{if(NR==START){ for(i=1;i<COL_END;i++) print $i} }' < $RESULTS_FILE) | tr "\n" "\t"| head -c -1)
+		#If no events this should just include sensor data (concatenate_results should automatically adjust)
 		SENSORS_EVENTS_HEADER=$((awk -v SEP='\t' -v START=$(($RESULTS_BEGIN_LINE-1)) -v COL_START=$(($BENCHMARK_NAME_COLUMN+1)) 'BEGIN{FS=SEP}{if(NR==START){ for(i=COL_START;i<=NF;i++) print $i} }' < $RESULTS_FILE) | tr "\n" "\t" | head -c -1)
 	
 		if [[ -z $SAVE_FILE ]]; then
