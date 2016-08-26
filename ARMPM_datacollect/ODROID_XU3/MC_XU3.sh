@@ -163,8 +163,8 @@ do
                 echo "Invalid input: option -n has already been used!" >&2
                 exit 1                
             fi
-            if [[ "$OPTARG" -le 0 ]]; then
-                echo "Invalid input: option -n needs to have a positive integer!" >&2
+            if [[ "$OPTARG" -le 0 || "$OPTARG" -gt 999999999 ]]; then
+                echo "Invalid input: option -n needs to have a positive integer and be less than 999999999 to prevent overflow!" >&2
                 exit 1
             else        
                 NUM_RUNS="$OPTARG"                        
@@ -200,11 +200,6 @@ fi
 if [[ -z $BENCH_EXEC ]]; then
     	echo "Nothing to run. Expected -x flag!" >&2
     	exit 1
-fi
-
-if [[ -z $EVENTS_LIST_FILE ]]; then
-        echo "Invalid input: option -e (events list) has not been specified!" >&2
-        exit 1
 fi
 
 if [[ -z $SAMPLE_TIME ]]; then
@@ -277,8 +272,10 @@ do
 done
 
 echo "Sanity check."
+
 cpufreq-set -d 2000000 -u 2000000 -c 4
 cpufreq-set -d 1400000 -u 1400000 -c 0
+
 cpufreq-info
 cset shield
 
@@ -300,9 +297,15 @@ do
 		#taskset -c $CORE_COLLECT ./get_cpu_usage.sh -c $CORE_RUN -t $SAMPLE_NS > "usage.data" &
 		#PID_usage=$!
 		#disown
-
-		./get_cpu_events.sh -c $CORE_RUN -s "benchmarks.data" -x $BENCH_EXEC -e $EVENTS_LIST_FILE -t $SAMPLE_MS 2> "events_raw.data" 
-
+		
+		if [[ -n $EVENTS_LIST_FILE ]]; then
+			#If there is a specified events list then start events collection
+			 ./get_cpu_events.sh -c $CORE_RUN -s "benchmarks.data" -x $BENCH_EXEC -e $EVENTS_LIST_FILE -t $SAMPLE_MS 2> "events_raw.data" 
+		else
+			#Else initiate collection without PMU events just power data (this is useful for overhead computation)
+			$BENCH_EXEC > "benchmarks.data"
+		fi
+	
 		#after benchmarks have run kill sensor collect and smartpower (if chosen)
 		sleep 1
 		kill $PID_sensors > /dev/null
@@ -314,13 +317,16 @@ do
 		if [[ -n $SAVE_DIR ]]; then
 			mkdir -v -p "$SAVE_DIR/Run_$i/$FREQ_SELECT"
 			echo "Copying results to chosen dir: $SAVE_DIR/Run_$i/$FREQ_SELECT"
-			cp -v "sensors.data" "benchmarks.data" "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"
-			rm -v "sensors.data" "benchmarks.data" "events_raw.data"
+			cp -v "sensors.data" "benchmarks.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"
+			rm -v "sensors.data" "benchmarks.data"
+			#if we have event collection enabled, then copy those too
+			[[ -n $EVENTS_LIST_FILE ]] && cp -v "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"; rm -v "events_raw.data";
 		else
 			mkdir -v -p "Run_$i/$FREQ_SELECT"
 			echo "Copying results to dir: Run_$i/$FREQ_SELECT"
-			cp -v "sensors.data" "benchmarks.data" "events_raw.data" "Run_$i/$FREQ_SELECT"
-			rm -v "sensors.data" "benchmarks.data" "events_raw.data"
+			cp -v "sensors.data" "benchmarks.data" "Run_$i/$FREQ_SELECT"
+			rm -v "sensors.data" "benchmarks.data"
+	                [[ -n $EVENTS_LIST_FILE ]] && cp -v "events_raw.data" "Run_$i/$FREQ_SELECT"; rm -v "events_raw.data";
 		fi
 	done
 done

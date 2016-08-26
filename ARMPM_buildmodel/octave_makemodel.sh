@@ -1061,7 +1061,7 @@ else
 			touch "train_set.data" "test_set.data"
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TRAIN_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "train_set.data" 
 			awk -v START=$RESULTS_START_LINE -v SEP='\t' -v FREQ=${FREQ_LIST[$count]} -v BENCH_SET="${TEST_SET[*]}" 'BEGIN{FS = SEP;len=split(BENCH_SET,ARRAY," ")}{if (NR >= START && $4 == FREQ){for (i = 1; i <= len; i++){if ($2 == ARRAY[i]){print $0;next}}}}' $RESULTS_FILE > "test_set.data"
-			octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST')" 2> /dev/null)
+			octave_output+=$(octave --silent --eval "load_build_model('train_set.data','test_set.data',0,$(($EVENTS_COL_START-1)),$REGRESSAND_COL,'$EVENTS_LIST',${avg_total_runtime[$count]})" 2> /dev/null)
 			rm "train_set.data" "test_set.data"
 		done
 		data_count=$(echo "$octave_output" | awk -v SEP=' ' 'BEGIN{FS=SEP;count=0}{if ($1=="Average" && $2=="Power"){ count++ }}END{print count}' )
