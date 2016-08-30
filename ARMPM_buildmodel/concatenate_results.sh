@@ -12,7 +12,7 @@ COL_SEP="\t"
 time_convert=1000000000
 
 #requires getops, but this should not be an issue since ints built in bash
-while getopts ":r:n:e:sh" opt;
+while getopts ":r:n:esh" opt;
 do
     case $opt in
         h)
