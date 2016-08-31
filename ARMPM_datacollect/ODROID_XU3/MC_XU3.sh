@@ -149,8 +149,8 @@ do
                 echo "Invalid input: option -t has already been used!" >&2
                 exit 1
             fi
-            if [[ "$OPTARG" -le 0 ]]; then
-                echo "Invalid input: option -n needs to have a positive integer!" >&2
+            if [[ "$OPTARG" -le 0 || "$OPTARG" -gt 999999999 ]]; then
+                echo "Invalid input: option -t needs to have a positive integer and be less than 999999999 to prevent overflow!" >&2
                 exit 1
             else
                 SAMPLE_TIME="$OPTARG"
@@ -163,8 +163,8 @@ do
                 echo "Invalid input: option -n has already been used!" >&2
                 exit 1                
             fi
-            if [[ "$OPTARG" -le 0 || "$OPTARG" -gt 999999999 ]]; then
-                echo "Invalid input: option -n needs to have a positive integer and be less than 999999999 to prevent overflow!" >&2
+            if [[ "$OPTARG" -le 0 ]]; then
+                echo "Invalid input: option -n needs to have a positive integer!" >&2
                 exit 1
             else        
                 NUM_RUNS="$OPTARG"                        

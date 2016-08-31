@@ -68,17 +68,17 @@ do
             fi
             ;;
 
-        #specify the benchmark executable to be ran
+        #specify the sensor sample time
         t)
-            if (( $SAMPLE_TIME )); then
+            if [[ -n $SAMPLE_TIME ]]; then
                 echo "Invalid input: option -t has already been used!" >&2
                 exit 1
             fi
-            if (( !$OPTARG )); then
-                echo "Invalid input: option -n needs to have a positive integer!" >&2
+            if [[ "$OPTARG" -le 0 || "$OPTARG" -gt 999999999 ]]; then
+                echo "Invalid input: option -t needs to have a positive integer and be less than 999999999 to prevent overflow!" >&2
                 exit 1
             else
-		SAMPLE_TIME=$OPTARG
+                SAMPLE_TIME="$OPTARG"
             fi
             ;;
 
