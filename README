@@ -14,6 +14,9 @@ git remote add origin git@github.com:kranik/ARMPM.git
 #3) Configure sparse checkout
 git config core.sparsecheckout true
 echo "ARMPM_buildmodel/*" >> .git/info/sparse-checkout or echo "ARMPM_datacollect/*" >> .git/info/sparse-checkout
+echo ".gitignore" >> .git/info/sparse-checkout
+echo "LICENSE" >> .git/info/sparse-checkout
+echo "README" >> .git/info/sparse-checkout
 
 #4) Shallow clone 
 git pull --depth=1 origin master
