@@ -40,13 +40,11 @@ do
 		if [[ $opt == b ]]; then
 			MAX_CORE=7
 			MIN_CORE=4
-			CORE_COLLECT_FREQ=1400000
                		MAX_F=2000000
              		MIN_F=200000
                	else
 			MAX_CORE=3
 			MIN_CORE=0
-			CORE_COLLECT_FREQ=2000000
                		MAX_F=1400000
                		MIN_F=200000
               	fi
@@ -211,7 +209,7 @@ SAMPLE_NS=$SAMPLE_TIME
 SAMPLE_MS=$(echo "scale = 0; $SAMPLE_NS/1000000;" | bc )
 
 COREs=($(awk '{if($1 == "processor") print $3}' /proc/cpuinfo))
-for i in `seq 0 $((${#COREs[@]} - 1))`
+for i in $(seq 0 $((${#COREs[@]} - 1)))
 do
 	if [[ ${COREs[$i]} -ge $MIN_CORE && ${COREs[$i]} -le $MAX_CORE ]]; then
 		if [[ -z "$CORE_RUN" ]]; then 
@@ -219,7 +217,7 @@ do
 		else
 			#due to a bug in cpuset need to set the shield before I turn cores offline, hence not doing it here bit sumply storing them in an array
 			#I store hotplug core names with commas to keep it consistent even though I can just iterate through the list better with spaces in the array
-			if [[ $(( `echo $CORE_RUN | tr -cd ',' | wc -c` + 1 )) < $CORE_CHOSEN ]]; then
+			if [[ $(( $(echo "$CORE_RUN" | tr -cd ',' | wc -c) + 1 )) < $CORE_CHOSEN ]]; then
 				CORE_RUN+=",${COREs[$i]}"
 			elif [[ -z "$CORE_HOTPLUG" ]]; then
                         	CORE_HOTPLUG="${COREs[$i]}"
@@ -231,18 +229,18 @@ do
                 if [[ -z "$CORE_COLLECT" ]]; then 
                         CORE_COLLECT="${COREs[$i]}"
                 else    
-                        [[ $(( `echo $CORE_COLLECT | tr -cd ',' | wc -c` + 1 )) < $CORE_CHOSEN ]] && CORE_COLLECT+=",${COREs[$i]}"
+                        [[ $(( $(echo "$CORE_COLLECT" | tr -cd ',' | wc -c) + 1 )) < $CORE_CHOSEN ]] && CORE_COLLECT+=",${COREs[$i]}"
                 fi
 	fi
 done
 
 
-if [[ $(( `echo $CORE_RUN | tr -cd ',' | wc -c` + 1 )) < $CORE_CHOSEN ]]; then
+if [[ $(( $(echo "$CORE_RUN" | tr -cd ',' | wc -c) + 1 )) < $CORE_CHOSEN ]]; then
 	echo -e "Selected number of run COREs more than what the environment provides. Please check total number of enabled COREs on the system." >&2
 	exit 1
 else
-	echo "core_run = "$CORE_RUN
-	cset shield -c $CORE_RUN -k on --force
+	echo "core_run = $CORE_RUN"
+	cset shield -c "$CORE_RUN" -k on --force
 fi
 
 
@@ -264,7 +262,7 @@ if [[ -z "$CORE_COLLECT" ]]; then
 	done
 fi
 
-echo "core_hotplug = "$CORE_HOTPLUG
+echo "core_hotplug = $CORE_HOTPLUG"
 #Turning off unwanted cores to enable directed cluster sensor readings
 for i in ${CORE_HOTPLUG//,/ }
 do
@@ -280,16 +278,16 @@ cpufreq-info
 cset shield
 
 #Run benchmarks for specified number of runs
-for i in `seq 1 $NUM_RUNS`;
+for i in $(seq 1 "$NUM_RUNS");
 do   
 	echo "This is run $i out of $NUM_RUNS"                    
 	for FREQ_SELECT in $CORE_FREQ
 	do
-		cpufreq-set -d $FREQ_SELECT -u $FREQ_SELECT -c $CORE_RUN
+		cpufreq-set -d "$FREQ_SELECT" -u "$FREQ_SELECT" -c "$CORE_RUN"
 		echo "Core frequency: $FREQ_SELECT""Mhz" 
 		
 		#Run collections scripts in parallel to the benchmarks
-		./sensors 1 1 $SAMPLE_NS > "sensors.data" &
+		./sensors 1 1 "$SAMPLE_NS" > "sensors.data" &
 		PID_sensors=$!
 		disown
 		
@@ -300,7 +298,7 @@ do
 		
 		if [[ -n $EVENTS_LIST_FILE ]]; then
 			#If there is a specified events list then start events collection
-			 ./get_cpu_events.sh -c $CORE_RUN -s "benchmarks.data" -x $BENCH_EXEC -e $EVENTS_LIST_FILE -t $SAMPLE_MS 2> "events_raw.data" 
+			 ./get_cpu_events.sh -c "$CORE_RUN" -s "benchmarks.data" -x "$BENCH_EXEC" -e "$EVENTS_LIST_FILE" -t "$SAMPLE_MS" 2> "events_raw.data" 
 		else
 			#Else initiate collection without PMU events just power data (this is useful for overhead computation)
 			$BENCH_EXEC > "benchmarks.data"

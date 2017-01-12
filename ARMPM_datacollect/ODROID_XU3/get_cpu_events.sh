@@ -127,9 +127,9 @@ if [[ -z $SAMPLE_TIME ]]; then
 fi
 
 #Programmable head line and column separator. By default I assume data start at line 3 (first line is descriptio, second is column heads and third is actual data). Columns separated by tab(s).
-EVENTS_LABELS=$(awk -v START=1 '{if (NR == START) {print $0}}' $EVENTS_LIST_FILE)
+EVENTS_LABELS=$(awk -v START=1 '{if (NR == START) {print $0}}' "$EVENTS_LIST_FILE")
 IFS=',' read -a EVENTS_LABELS <<< "$EVENTS_LABELS"
-EVENTS_LIST=$(awk -v START=2 '{if (NR == START) {print $0}}' $EVENTS_LIST_FILE)
+EVENTS_LIST=$(awk -v START=2 '{if (NR == START) {print $0}}' "$EVENTS_LIST_FILE")
 IFS=',' read -a EVENTS_RAW <<< "$EVENTS_LIST"
 
 : << 'END'
@@ -143,12 +143,12 @@ ev7_name=r017 #L2 refill(miss)
 END
 
 echo -e "Start:\t$(date +'%s%N')" >&2
-for i in `seq 0 $(( ${#EVENTS_LABELS[@]} - 1 ))`
+for i in $(seq 0 $(( ${#EVENTS_LABELS[@]} - 1 )))
 do
-	echo -e "Event $(( $i+1 )) Label:\t${EVENTS_LABELS[$i]}\t\tRAW Identifier:\t${EVENTS_RAW[$i]}" >&2
+	echo -e "Event $(( i+1 )) Label:\t${EVENTS_LABELS[$i]}\t\tRAW Identifier:\t${EVENTS_RAW[$i]}" >&2
 done
 
 [[ -z $BENCH_SAVE ]] && BENCH_SAVE=/dev/stdout
-./perf stat -g --cpu $CORE_RUN -e $EVENTS_LIST -I $SAMPLE_TIME -x "\t" $BENCH_EXEC > $BENCH_SAVE #2> /dev/null
+./perf stat -g --cpu "$CORE_RUN" -e "$EVENTS_LIST" -I "$SAMPLE_TIME" -x "\t" "$BENCH_EXEC" > $BENCH_SAVE #2> /dev/null
 #execute perf that follows the thread this is to provide me with a base scenario
 #./perf stat -g -e $EVENTS_LIST -I $SAMPLE_TIME -x "\t" $BENCH_EXEC > $BENCH_SAVE #2> /dev/null

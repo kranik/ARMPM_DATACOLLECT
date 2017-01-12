@@ -1,2 +1,0 @@
-CPU cycles,Bus Cycle,Data Mem Access,L1 ICache Access,Clock Cycles,L1 DCache Write-Back,Instr. Arch. Exec.
-r0FF,r01D,r013,r014,r011,r015,r008
