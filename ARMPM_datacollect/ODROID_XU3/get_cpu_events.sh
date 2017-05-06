@@ -132,6 +132,10 @@ IFS=',' read -a EVENTS_LABELS <<< "$EVENTS_LABELS"
 EVENTS_LIST=$(awk -v START=2 '{if (NR == START) {print $0}}' "$EVENTS_LIST_FILE")
 IFS=',' read -a EVENTS_RAW <<< "$EVENTS_LIST"
 
+#Prepare input to bench exec file - number of cores/threads(PARSEC) or instances(cBench)
+#Variable name is CORE_CHOSEN to keep it consistent with MC_XU3.sh naming
+CORE_CHOSEN=$(( $(echo "$CORE_RUN" | tr -cd ',' | wc -c) + 1 ))
+
 : << 'END'
 ev1_name=r0FF #r011 #cycles
 ev2_name=r01B #instructions speculative
@@ -149,6 +153,6 @@ do
 done
 
 [[ -z $BENCH_SAVE ]] && BENCH_SAVE=/dev/stdout
-./perf stat -g --cpu "$CORE_RUN" -e "$EVENTS_LIST" -I "$SAMPLE_TIME" -x "\t" "$BENCH_EXEC" > $BENCH_SAVE #2> /dev/null
+./perf stat -g --cpu "$CORE_RUN" -e "$EVENTS_LIST" -I "$SAMPLE_TIME" -x "\t" "$BENCH_EXEC" $CORE_CHOSEN > $BENCH_SAVE #2> /dev/null
 #execute perf that follows the thread this is to provide me with a base scenario
 #./perf stat -g -e $EVENTS_LIST -I $SAMPLE_TIME -x "\t" $BENCH_EXEC > $BENCH_SAVE #2> /dev/null
