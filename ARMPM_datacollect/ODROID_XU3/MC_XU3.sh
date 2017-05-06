@@ -126,13 +126,13 @@ do
             fi
             ;;
 
-        #specify the benchmark executable to be ran
+        #specify the events list file
         e)
             if [[ -n $EVENTS_LIST_FILE ]]; then
                 echo "Invalid input: option -e has already been used!" >&2
                 exit 1
             fi
-            #Make sure the benchmark directory selected exists
+            #Make sure the selected events file exists
             if ! [[ -e "$OPTARG" ]]; then
                 echo "-e $OPTARG does not exist. Please enter the events list file!" >&2
                 exit 1
@@ -154,9 +154,8 @@ do
                 SAMPLE_TIME="$OPTARG"
             fi
             ;;
-
+        #Choose the number of runs. Data from different runs is saved in Run_(run number) subfolders in the save directory
         n)
-            #Choose the number of runs. Data from different runs is saved in Run_(run number) subfolders in the save directory
             if [[ -n $NUM_RUNS ]]; then
                 echo "Invalid input: option -n has already been used!" >&2
                 exit 1                
@@ -286,7 +285,10 @@ do
 		cpufreq-set -d "$FREQ_SELECT" -u "$FREQ_SELECT" -c "$CORE_RUN"
 		echo "Core frequency: $FREQ_SELECT""Mhz" 
 		
-		#Run collections scripts in parallel to the benchmarks
+		#Run collections scripts in parallel to the benchmarks.
+		#I can input the number of enabled LITTLE and big cores for sensor script, but for now I don't care about individual temperature so I'm just using 1 1 to save space on the output files. freq/volt/curr/power are all agreated per-cluster so 1 1 enables me to get that inforamtion from the sensors for both clusters. 
+		#The only benefit of adding the involved cores would be to give me per-core temperature information, but those are normalized by the big fan anyway.
+		#Technically CORE_CHOSEN represents number of big cores, size of CORE_COLLECT represent number of LITTLE and I can specify those for the sensors collection in the future if I need to.
 		./sensors 1 1 "$SAMPLE_NS" > "sensors.data" &
 		PID_sensors=$!
 		disown
@@ -300,8 +302,8 @@ do
 			#If there is a specified events list then start events collection
 			 ./get_cpu_events.sh -c "$CORE_RUN" -s "benchmarks.data" -x "$BENCH_EXEC" -e "$EVENTS_LIST_FILE" -t "$SAMPLE_MS" 2> "events_raw.data" 
 		else
-			#Else initiate collection without PMU events just power data (this is useful for overhead computation)
-			$BENCH_EXEC > "benchmarks.data"
+			#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times
+			$BENCH_EXEC $CORE_CHOSEN > "benchmarks.data"
 		fi
 	
 		#after benchmarks have run kill sensor collect and smartpower (if chosen)
@@ -343,3 +345,4 @@ cset shield
 
 echo "Script End! :)"
 exit
+s
