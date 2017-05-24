@@ -276,6 +276,13 @@ cpufreq-set -d 1400000 -u 1400000 -c 0
 cpufreq-info
 cset shield
 
+#Turn on fan on max power to avoid throttling on 4 cores.
+#Start manual mode
+echo 0 > "/sys/devices/odroid_fan.15/fan_mode"
+#Put fan on MAX RPM
+echo 255 > "/sys/devices/odroid_fan.15/pwm_duty"
+
+
 #Run benchmarks for specified number of runs
 for i in $(seq 1 "$NUM_RUNS");
 do   
@@ -342,6 +349,9 @@ cset shield --reset
 echo "Sanity check."
 cpufreq-info
 cset shield
+
+#Put back fan on automatic mode
+echo 1 > "/sys/devices/odroid_fan.15/fan_mode"
 
 echo "Script End! :)"
 exit
