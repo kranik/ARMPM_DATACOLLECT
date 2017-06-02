@@ -2,6 +2,18 @@
 #This is my main script to run benchmarks in parallel with sensor collection
 #KrNikov 2014
 
+#Global params for ODROID-XU3
+BIG_MAX_CORE=7
+BIG_MIN_CORE=4
+BIG_MAX_F=2000000
+BIG_MIN_F=200000
+
+LITTLE_MAX_CORE=3
+LITTLE_MIN_CORE=0
+LITTLE_MAX_F=1400000
+LITTLE_MIN_F=200000
+
+            
 if [[ "$#" -eq 0 ]]; then
   echo "This program requires inputs. Type -h for help." >&2
   exit 1
@@ -16,7 +28,8 @@ do
             echo "Available flags and options:" >&2
             echo "-b [NUMBER] -> Turn on collection for big cores [benchmarks and monitors]. Specify number of cores to involve."
             echo "-L [NUMBER] -> Turn on collection for LITTLE cores [benchmarks and monitors]. Specify number of cores to involve."
-            echo "-f [FREQEUNCIES] -> Specify frequencies in Hz, separated by commas. Range is determined by core type."
+            echo "-f [FREQEUNCIES] -> Specify frequencies in Hz, separated by commas. Range is determined by core type. First core type."
+			echo "-q [FREQEUNCIES] -> Specify frequencies in Hz, separated by commas. Range is determined by core type. Second core (if selected)."
             echo "-s [DIRECTORY] -> Specify a save directory for the results of the different runs. If flag is not specified program uses current directory"
             echo "-x [DIRECTORY] -> Specify the benchmark executable to be run. If multiple benchmarks are to be ran, put them all in a script and set that."
             echo "-e [DIRECTORY] -> Specify the events to be collected. Event labels must be on line 1, separated by commas. Event RAW identifiers must be sepcified on line 2, separated by commas."
@@ -25,66 +38,56 @@ do
             echo "Mandatory options are: -b/-L [1-4] -f [FREQ LIST] -x [DIR] -t [NUM] -n [NUM]"
             exit 0 
             ;;
-        b|L)
+			
+        b)
             #Make sure command has not already been processed (flag is unset)
-            	if [[ -n $CORE_CHOSEN ]]; then
-                	echo "Invalid input: option -b or -L has already been used!" >&2
-                	exit 1
-		fi
-                
-		if ! [[ "$OPTARG" =~ ^[1-4]$ ]]; then
-                	echo "Invalid input: $OPTARG needs to be 1-4 (number of cores)!" >&2
-			exit 1
-		fi
-
-		if [[ $opt == b ]]; then
-			MAX_CORE=7
-			MIN_CORE=4
-               		MAX_F=2000000
-             		MIN_F=200000
-               	else
-			MAX_CORE=3
-			MIN_CORE=0
-               		MAX_F=1400000
-               		MIN_F=200000
-              	fi
-               	
-		CORE_CHOSEN="$OPTARG"
+			if [[ -n $BIG_CHOSEN ]]; then
+				echo "Invalid input: option -b has already been used!" >&2
+				exit 1
+			else
+				BIG_CHOSEN="$OPTARG"
+			fi
 		;;
-
-	f)
-                if [[ -n $CORE_FREQ ]]; then
-                        echo "Invalid input: option -f has already been used!" >&2
-                        exit 1
-                fi
-
-            	spaced_OPTARG="${OPTARG//,/ }"
-
-            	#Go throught the selected frequecnies and make sure they are not out of bounds
-	    	#Also make sure they are present in the frequency table located at /sys/devices/system/cpu/cpufreq/iks-cpufreq/freq_table because the kernel rounds up
-            	#Specifying a higher/lower frequency or an odd frequency is now wrong, jsut the kernel handles it in the background and might lead to collection of unwanted resutls
-            	for FREQ_SELECT in $spaced_OPTARG
-            	do
-            		if [[ $FREQ_SELECT -gt $MAX_F || $FREQ_SELECT -lt $MIN_F ]]; then 
-		    		echo "selected frequency $FREQ_SELECT for -$opt is out of bounds. Range is [$MAX_F;$MIN_F]"
-                    		exit 1
-                	else
-				[[ -z "$CORE_FREQ" ]] && CORE_FREQ="$FREQ_SELECT" || CORE_FREQ+=" $FREQ_SELECT"
-                    	fi
-            	done
-            	;;
+		
+		L)
+            #Make sure command has not already been processed (flag is unset)
+			if [[ -n $LITTLE_CHOSEN ]]; then
+				echo "Invalid input: option -b has already been used!" >&2
+				exit 1
+			else
+				LITTLE_CHOSEN="$OPTARG"
+			fi
+		;;
+		
+		f)
+			if [[ -n $CORE1_FREQ ]]; then
+				echo "Invalid input: option -f has already been used!" >&2
+				exit 1
+			else
+				CORE1_FREQ="${OPTARG//,/ }"
+			fi
+		;;
+		
+		q)
+			if [[ -n $CORE2_FREQ ]]; then
+				echo "Invalid input: option -q has already been used!" >&2
+				exit 1
+			else
+				CORE2_FREQ="${OPTARG//,/ }"
+			fi
+		;;		
 
         #Specify the save directory, if no save directory is chosen the results are saved in the $PWD
         s)
-		if [[ -n $SAVE_DIR ]]; then
-               		echo "Invalid input: option -s has already been used!" >&2
-               		exit 1                
-            	fi
+			if [[ -n $SAVE_DIR ]]; then
+				echo "Invalid input: option -s has already been used!" >&2
+				exit 1                
+			fi
 
-		if [[ -L "$OPTARG" ]]; then
-                 	echo "-s $OPTARG is a symbolic link. Please enter a directory!" >&2
-			exit 1
-		elif [[ -d "$OPTARG" ]]; then
+			if [[ -L "$OPTARG" ]]; then
+				echo "-s $OPTARG is a symbolic link. Please enter a directory!" >&2
+				exit 1
+			elif [[ -d "$OPTARG" ]]; then
                     	#wait on user input here (Y/N)
                     	#if user says Y set writing directory to that
                     	#if no then exit and ask for better input parameters
@@ -178,14 +181,19 @@ do
     esac
 done
 
-#Check if user has specified something to run
-if [[ -z $CORE_CHOSEN ]]; then
-    	echo "Nothing to run. Expected -b or -L flag!" >&2
+#Critical checks
+if [[ -z $BIG_CHOSEN && -z $LITTLE_CHOSEN ]]; then
+    	echo "Nothing to run. Expected -b or -L flag (or both)!" >&2
     	exit 1
 fi
 
-if [[ -z $CORE_FREQ ]]; then
+if [[ -z $CORE1_FREQ ]]; then
     	echo "Nothing to run. Expected -f flag!" >&2
+    	exit 1
+fi
+
+if [[ -n $BIG_CHOSEN && -n $LITTLE_CHOSEN && -z $CORE2_FREQ ]]; then
+    	echo "Error: Expected -q flag when both -b and -L are selected to specify LITTLE core freqeuncy list!" >&2
     	exit 1
 fi
 
@@ -204,6 +212,62 @@ if [[ -z $SAMPLE_TIME ]]; then
         exit 1
 fi
 
+#Additional checks
+if [[ -n $BIG_CHOSEN ]]; then
+	if ! [[ "$BIG_CHOSEN" =~ ^[1-4]$ ]]; then
+		echo "Invalid input: -b needs to be 1-4 (number of cores)!" >&2
+		exit 1
+	fi
+	#Freq check
+	for FREQ_SELECT in $CORE1_FREQ
+	do
+		if [[ $FREQ_SELECT -gt $BIG_MAX_F || $FREQ_SELECT -lt $BIG_MIN_F ]]; then 
+			echo "selected frequency $FREQ_SELECT for -f is out of bounds for selected big cores (-b). Range is [$BIG_MIN_F;$BIG_MAX_F]"
+			exit 1
+		fi
+	done
+	
+	if [[ -n $LITTLE_CHOSEN ]]; then
+		if ! [[ "$LITTLE_CHOSEN" =~ ^[1-4]$ ]]; then
+			echo "Invalid input: -b needs to be 1-4 (number of cores)!" >&2
+			exit 1
+		fi
+		#Freq check
+		for FREQ_SELECT in $CORE2_FREQ
+		do
+			if [[ $FREQ_SELECT -gt $LITTLE_MAX_F || $FREQ_SELECT -lt $LITTLE_MIN_F ]]; then 
+				echo "selected frequency $FREQ_SELECT for -q is out of bounds for selected big cores (-L). Range is [$LITTLE_MIN_F;$LITTLE_MAX_F]"
+				exit 1
+			fi
+		done
+		#Set max and min core
+		MIN_CORE="$LITTLE_MIN_CORE"
+		MAX_CORE="$BIG_MAX_CORE"
+	else
+		#Set max and min core
+		MIN_CORE="$BIG_MIN_CORE"
+		MAX_CORE="$BIG_MAX_CORE"
+	fi
+fi
+
+if [[ -n $LITTLE_CHOSEN ]]; then
+	if ! [[ "$LITTLE_CHOSEN" =~ ^[1-4]$ ]]; then
+		echo "Invalid input: -b needs to be 1-4 (number of cores)!" >&2
+		exit 1
+	fi
+	#Freq check
+	for FREQ_SELECT in $CORE1_FREQ
+	do
+		if [[ $FREQ_SELECT -gt $LITTLE_MAX_F || $FREQ_SELECT -lt $LITTLE_MIN_F ]]; then
+			echo "selected frequency $FREQ_SELECT for -f is out of bounds for selected big cores (-L). Range is [$LITTLE_MIN_F;$LITTLE_MAX_F]"
+			exit 1
+		fi
+	done
+	#Set max and min core
+	MIN_CORE="$LITTLE_MIN_CORE"
+	MAX_CORE="$LITTLE_MAX_CORE"
+fi
+			
 SAMPLE_NS=$SAMPLE_TIME
 SAMPLE_MS=$(echo "scale = 0; $SAMPLE_NS/1000000;" | bc )
 
@@ -287,53 +351,118 @@ echo 255 > "/sys/devices/odroid_fan.15/pwm_duty"
 for i in $(seq 1 "$NUM_RUNS");
 do   
 	echo "This is run $i out of $NUM_RUNS"                    
-	for FREQ_SELECT in $CORE_FREQ
+	for FREQ_SELECT in $CORE1_FREQ
 	do
-		cpufreq-set -d "$FREQ_SELECT" -u "$FREQ_SELECT" -c "$CORE_RUN"
-		echo "Core frequency: $FREQ_SELECT""Mhz" 
-		
-		#Run collections scripts in parallel to the benchmarks.
-		#I can input the number of enabled LITTLE and big cores for sensor script, but for now I don't care about individual temperature so I'm just using 1 1 to save space on the output files. freq/volt/curr/power are all agreated per-cluster so 1 1 enables me to get that inforamtion from the sensors for both clusters. 
-		#The only benefit of adding the involved cores would be to give me per-core temperature information, but those are normalized by the big fan anyway.
-		#Technically CORE_CHOSEN represents number of big cores, size of CORE_COLLECT represent number of LITTLE and I can specify those for the sensors collection in the future if I need to.
-		./sensors 1 1 "$SAMPLE_NS" > "sensors.data" &
-		PID_sensors=$!
-		disown
-		
-		#Run collections scripts in parallel to the benchmarks
-		#taskset -c $CORE_COLLECT ./get_cpu_usage.sh -c $CORE_RUN -t $SAMPLE_NS > "usage.data" &
-		#PID_usage=$!
-		#disown
-		
-		if [[ -n $EVENTS_LIST_FILE ]]; then
-			#If there is a specified events list then start events collection
-			 ./get_cpu_events.sh -c "$CORE_RUN" -s "benchmarks.data" -x "$BENCH_EXEC" -e "$EVENTS_LIST_FILE" -t "$SAMPLE_MS" 2> "events_raw.data" 
-		else
-			#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times
-			$BENCH_EXEC $CORE_CHOSEN > "benchmarks.data"
-		fi
-	
-		#after benchmarks have run kill sensor collect and smartpower (if chosen)
-		sleep 1
-		kill $PID_sensors > /dev/null
-		#kill $PID_usage > /dev/null
-		sleep 1
-                echo "Data collection completed successfully"
+		#Check for double core
+	    if [[ -n $BIG_CHOSEN && -n $LITTLE_CHOSEN ]]; then
+			cpufreq-set -d "$FREQ_SELECT" -u "$FREQ_SELECT" -c 4
+			echo "Core frequency (big): $FREQ_SELECT""Mhz"
+			for FREQ2_SELECT in $CORE2_FREQ
+			do
+				cpufreq-set -d "$FREQ_SELECT" -u "$FREQ_SELECT" -c 0
+				echo "Core frequency (LITTLE): $FREQ_SELECT""Mhz"
+				#Run collections scripts in parallel to the benchmarks.
+				#I can input the number of enabled LITTLE and big cores for sensor script, but for now I don't care about individual temperature so I'm just using 1 1 to save space on the output files. freq/volt/curr/power are all agreated per-cluster so 1 1 enables me to get that inforamtion from the sensors for both clusters. 
+				#The only benefit of adding the involved cores would be to give me per-core temperature information, but those are normalized by the big fan anyway.
+				#Technically CORE_CHOSEN represents number of big cores, size of CORE_COLLECT represent number of LITTLE and I can specify those for the sensors collection in the future if I need to.
+				./sensors 1 1 "$SAMPLE_NS" > "sensors.data" &
+				PID_sensors=$!
+				disown
+				
+				#Run collections scripts in parallel to the benchmarks
+				#taskset -c $CORE_COLLECT ./get_cpu_usage.sh -c $CORE_RUN -t $SAMPLE_NS > "usage.data" &
+				#PID_usage=$!
+				#disown
+				
+				if [[ -n $EVENTS_LIST_FILE ]]; then
+					#If there is a specified events list then start events collection
+					 ./get_cpu_events.sh -c "$CORE_RUN" -s "benchmarks.data" -x "$BENCH_EXEC" -e "$EVENTS_LIST_FILE" -t "$SAMPLE_MS" 2> "events_raw.data" 
+				else
+					#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times
+					$BENCH_EXEC $CORE_CHOSEN > "benchmarks.data"
+				fi
+			
+				#after benchmarks have run kill sensor collect and smartpower (if chosen)
+				sleep 1
+				kill $PID_sensors > /dev/null
+				#kill $PID_usage > /dev/null
+				sleep 1
+				echo "Data collection completed successfully"
 
-		#Organize results -> copy them in the save dir that is specified or put them in the PWD
-		if [[ -n $SAVE_DIR ]]; then
-			mkdir -v -p "$SAVE_DIR/Run_$i/$FREQ_SELECT"
-			echo "Copying results to chosen dir: $SAVE_DIR/Run_$i/$FREQ_SELECT"
-			cp -v "sensors.data" "benchmarks.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"
-			rm -v "sensors.data" "benchmarks.data"
-			#if we have event collection enabled, then copy those too
-			[[ -n $EVENTS_LIST_FILE ]] && cp -v "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"; rm -v "events_raw.data";
+				#Organize results -> copy them in the save dir that is specified or put them in the PWD
+				if [[ -n $SAVE_DIR ]]; then
+					mkdir -v -p "$SAVE_DIR/Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+					echo "Copying results to chosen dir: $SAVE_DIR/Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+					cp -v "sensors.data" "benchmarks.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+					rm -v "sensors.data" "benchmarks.data"
+					#if we have event collection enabled, then copy those too
+					if [[ -n $EVENTS_LIST_FILE ]]; then
+						cp -v "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+						rm -v "events_raw.data"
+					fi
+				else
+					mkdir -v -p "Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+					echo "Copying results to dir: Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+					cp -v "sensors.data" "benchmarks.data" "Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+					rm -v "sensors.data" "benchmarks.data"
+					if [[ -n $EVENTS_LIST_FILE ]]; then
+						cp -v "events_raw.data" "Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+						rm -v "events_raw.data"
+					fi
+				fi
+			done
 		else
-			mkdir -v -p "Run_$i/$FREQ_SELECT"
-			echo "Copying results to dir: Run_$i/$FREQ_SELECT"
-			cp -v "sensors.data" "benchmarks.data" "Run_$i/$FREQ_SELECT"
-			rm -v "sensors.data" "benchmarks.data"
-	                [[ -n $EVENTS_LIST_FILE ]] && cp -v "events_raw.data" "Run_$i/$FREQ_SELECT"; rm -v "events_raw.data";
+			cpufreq-set -d "$FREQ_SELECT" -u "$FREQ_SELECT" -c "$CORE_RUN"
+			echo "Core frequency: $FREQ_SELECT""Mhz"
+			#Run collections scripts in parallel to the benchmarks.
+			#I can input the number of enabled LITTLE and big cores for sensor script, but for now I don't care about individual temperature so I'm just using 1 1 to save space on the output files. freq/volt/curr/power are all agreated per-cluster so 1 1 enables me to get that inforamtion from the sensors for both clusters. 
+			#The only benefit of adding the involved cores would be to give me per-core temperature information, but those are normalized by the big fan anyway.
+			#Technically CORE_CHOSEN represents number of big cores, size of CORE_COLLECT represent number of LITTLE and I can specify those for the sensors collection in the future if I need to.
+			./sensors 1 1 "$SAMPLE_NS" > "sensors.data" &
+			PID_sensors=$!
+			disown
+			
+			#Run collections scripts in parallel to the benchmarks
+			#taskset -c $CORE_COLLECT ./get_cpu_usage.sh -c $CORE_RUN -t $SAMPLE_NS > "usage.data" &
+			#PID_usage=$!
+			#disown
+			
+			if [[ -n $EVENTS_LIST_FILE ]]; then
+				#If there is a specified events list then start events collection
+				 ./get_cpu_events.sh -c "$CORE_RUN" -s "benchmarks.data" -x "$BENCH_EXEC" -e "$EVENTS_LIST_FILE" -t "$SAMPLE_MS" 2> "events_raw.data" 
+			else
+				#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times
+				$BENCH_EXEC $CORE_CHOSEN > "benchmarks.data"
+			fi
+		
+			#after benchmarks have run kill sensor collect and smartpower (if chosen)
+			sleep 1
+			kill $PID_sensors > /dev/null
+			#kill $PID_usage > /dev/null
+			sleep 1
+					echo "Data collection completed successfully"
+
+			#Organize results -> copy them in the save dir that is specified or put them in the PWD
+			if [[ -n $SAVE_DIR ]]; then
+				mkdir -v -p "$SAVE_DIR/Run_$i/$FREQ_SELECT"
+				echo "Copying results to chosen dir: $SAVE_DIR/Run_$i/$FREQ_SELECT"
+				cp -v "sensors.data" "benchmarks.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"
+				rm -v "sensors.data" "benchmarks.data"
+				#if we have event collection enabled, then copy those too
+				if [[ -n $EVENTS_LIST_FILE ]]; then
+					cp -v "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT"
+					rm -v "events_raw.data"
+				fi
+			else
+				mkdir -v -p "Run_$i/$FREQ_SELECT"
+				echo "Copying results to dir: Run_$i/$FREQ_SELECT"
+				cp -v "sensors.data" "benchmarks.data" "Run_$i/$FREQ_SELECT"
+				rm -v "sensors.data" "benchmarks.data"
+				if [[ -n $EVENTS_LIST_FILE ]]; then
+					cp -v "events_raw.data" "Run_$i/$FREQ_SELECT"
+					rm -v "events_raw.data"
+				fi
+			fi
 		fi
 	done
 done
@@ -355,4 +484,3 @@ echo 1 > "/sys/devices/odroid_fan.15/fan_mode"
 
 echo "Script End! :)"
 exit
-s
