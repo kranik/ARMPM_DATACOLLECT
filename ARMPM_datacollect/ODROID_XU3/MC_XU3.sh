@@ -28,7 +28,6 @@ do
             echo "Available flags and options:" >&2
             echo "-b [NUMBER] -> Turn on collection for big cores [benchmarks and monitors]. Specify number of cores to involve."
             echo "-L [NUMBER] -> Turn on collection for LITTLE cores [benchmarks and monitors]. Specify number of cores to involve."
-		echo "-m [NUMBER] -> Turn on collection for sequential code for multicluster code."
             echo "-f [FREQEUNCIES] -> Specify frequencies in Hz, separated by commas. Range is determined by core type. First core type."
 		echo "-q [FREQEUNCIES] -> Specify frequencies in Hz, separated by commas. Range is determined by core type. Second core (if selected)."
             echo "-s [DIRECTORY] -> Specify a save directory for the results of the different runs. If flag is not specified program uses current directory"
@@ -57,16 +56,6 @@ do
 				exit 1
 			else
 				LITTLE_CHOSEN="$OPTARG"
-			fi
-		;;
-		
-	m)
-            	#Make sure command has not already been processed (flag is unset)
-			if [[ -n $SEQ_CHOSEN ]]; then
-				echo "Invalid input: option -m has already been used!" >&2
-				exit 1
-			else
-				SEQ_CHOSEN="$OPTARG"
 			fi
 		;;
 
@@ -208,11 +197,6 @@ if [[ -n $BIG_CHOSEN && -n $LITTLE_CHOSEN && -z $CORE2_FREQ ]]; then
     	exit 1
 fi
 
-if [[ -n $BIG_CHOSEN && -n $LITTLE_CHOSEN && -z $SEQ_CHOSEN ]]; then
-    	echo "Error: Expected -m flag when both -b and -L are selected to specify sequatial code execute core (0 for LITTLE or 4 for big)!" >&2
-    	exit 1
-fi
-
 if [[ -z $NUM_RUNS ]]; then
     	echo "Nothing to run. Expected -n flag!" >&2
     	exit 1
@@ -283,13 +267,6 @@ else
 	MIN_CORE="$LITTLE_MIN_CORE"
 	MAX_CORE="$LITTLE_MAX_CORE"
 	CORE_CHOSEN="$LITTLE_CHOSEN"
-fi
-
-if [[ -n $SEQ_CHOSEN ]]; then
-	if [[ "$SEQ_CHOSEN" != 0 && "$SEQ_CHOSEN" != 4 ]]; then
-                echo "Invalid input: -m needs to be 0 or 4 (LITTLE or big)!" >&2
-                exit 1
-	fi
 fi
 
 SAMPLE_NS=$SAMPLE_TIME
@@ -380,8 +357,7 @@ do
 					#If there is a specified events list then start events collection
 					 ./get_cpu_events.sh -c "$CORE_RUN" -s "benchmarks.data" -x "$BENCH_EXEC" -e "$EVENTS_LIST_FILE" -t "$SAMPLE_MS" 2> "events_raw.data" 
 				else
-					#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times. We can also specify the core list as safe check to use taskset in the bench exec.
-	taskset -c -p $3 $PROC_parsec	
+					#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times. We can also specify the core list as safe check to use taskset in the bench exec.	
 					$BENCH_EXEC "$CORE_CHOSEN" "$CORE_RUN"  > "benchmarks.data"
 				fi
 			
@@ -435,7 +411,7 @@ do
 				 ./get_cpu_events.sh -c "$CORE_RUN" -s "benchmarks.data" -x "$BENCH_EXEC" -e "$EVENTS_LIST_FILE" -t "$SAMPLE_MS" 2> "events_raw.data" 
 			else
 				#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times
-				$BENCH_EXEC $CORE_CHOSEN > "benchmarks.data"
+				$BENCH_EXEC "$CORE_CHOSEN" "$CORE_RUN" > "benchmarks.data"
 			fi
 		
 			#after benchmarks have run kill sensor collect and smartpower (if chosen)
