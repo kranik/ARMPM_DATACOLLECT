@@ -21,15 +21,16 @@ fi
 
 #main loop b=big L=LITTLE s=save directory n=specify number of runs -t=benchmark directory -h=help
 #requires getops, but this should not be an issue since ints built in bash
-while getopts ":b:L:f:s:x:t:n:e:h" opt;
+while getopts ":b:L:m:f:q:s:x:t:n:e:h" opt;
 do
     case $opt in
         h)
             echo "Available flags and options:" >&2
             echo "-b [NUMBER] -> Turn on collection for big cores [benchmarks and monitors]. Specify number of cores to involve."
             echo "-L [NUMBER] -> Turn on collection for LITTLE cores [benchmarks and monitors]. Specify number of cores to involve."
+		echo "-m [NUMBER] -> Turn on collection for sequential code for multicluster code."
             echo "-f [FREQEUNCIES] -> Specify frequencies in Hz, separated by commas. Range is determined by core type. First core type."
-			echo "-q [FREQEUNCIES] -> Specify frequencies in Hz, separated by commas. Range is determined by core type. Second core (if selected)."
+		echo "-q [FREQEUNCIES] -> Specify frequencies in Hz, separated by commas. Range is determined by core type. Second core (if selected)."
             echo "-s [DIRECTORY] -> Specify a save directory for the results of the different runs. If flag is not specified program uses current directory"
             echo "-x [DIRECTORY] -> Specify the benchmark executable to be run. If multiple benchmarks are to be ran, put them all in a script and set that."
             echo "-e [DIRECTORY] -> Specify the events to be collected. Event labels must be on line 1, separated by commas. Event RAW identifiers must be sepcified on line 2, separated by commas."
@@ -49,7 +50,7 @@ do
 			fi
 		;;
 		
-		L)
+	L)
             #Make sure command has not already been processed (flag is unset)
 			if [[ -n $LITTLE_CHOSEN ]]; then
 				echo "Invalid input: option -b has already been used!" >&2
@@ -59,6 +60,16 @@ do
 			fi
 		;;
 		
+	m)
+            	#Make sure command has not already been processed (flag is unset)
+			if [[ -n $SEQ_CHOSEN ]]; then
+				echo "Invalid input: option -m has already been used!" >&2
+				exit 1
+			else
+				SEQ_CHOSEN="$OPTARG"
+			fi
+		;;
+
 		f)
 			if [[ -n $CORE1_FREQ ]]; then
 				echo "Invalid input: option -f has already been used!" >&2
@@ -197,6 +208,11 @@ if [[ -n $BIG_CHOSEN && -n $LITTLE_CHOSEN && -z $CORE2_FREQ ]]; then
     	exit 1
 fi
 
+if [[ -n $BIG_CHOSEN && -n $LITTLE_CHOSEN && -z $SEQ_CHOSEN ]]; then
+    	echo "Error: Expected -m flag when both -b and -L are selected to specify sequatial code execute core (0 for LITTLE or 4 for big)!" >&2
+    	exit 1
+fi
+
 if [[ -z $NUM_RUNS ]]; then
     	echo "Nothing to run. Expected -n flag!" >&2
     	exit 1
@@ -243,16 +259,16 @@ if [[ -n $BIG_CHOSEN ]]; then
 		#Set max and min core
 		MIN_CORE="$LITTLE_MIN_CORE"
 		MAX_CORE="$BIG_MAX_CORE"
+		CORE_CHOSEN=$(echo "scale = 0; $LITTLE_CHOSEN+$BIG_CHOSEN;" | bc )
 	else
 		#Set max and min core
 		MIN_CORE="$BIG_MIN_CORE"
 		MAX_CORE="$BIG_MAX_CORE"
+		CORE_CHOSEN="$BIG_CHOSEN"
 	fi
-fi
-
-if [[ -n $LITTLE_CHOSEN ]]; then
+else
 	if ! [[ "$LITTLE_CHOSEN" =~ ^[1-4]$ ]]; then
-		echo "Invalid input: -b needs to be 1-4 (number of cores)!" >&2
+		echo "Invalid input: -L needs to be 1-4 (number of cores)!" >&2
 		exit 1
 	fi
 	#Freq check
@@ -266,8 +282,16 @@ if [[ -n $LITTLE_CHOSEN ]]; then
 	#Set max and min core
 	MIN_CORE="$LITTLE_MIN_CORE"
 	MAX_CORE="$LITTLE_MAX_CORE"
+	CORE_CHOSEN="$LITTLE_CHOSEN"
 fi
-			
+
+if [[ -n $SEQ_CHOSEN ]]; then
+	if [[ "$SEQ_CHOSEN" != 0 && "$SEQ_CHOSEN" != 4 ]]; then
+                echo "Invalid input: -m needs to be 0 or 4 (LITTLE or big)!" >&2
+                exit 1
+	fi
+fi
+
 SAMPLE_NS=$SAMPLE_TIME
 SAMPLE_MS=$(echo "scale = 0; $SAMPLE_NS/1000000;" | bc )
 
@@ -297,35 +321,14 @@ do
 	fi
 done
 
-
 if [[ $(( $(echo "$CORE_RUN" | tr -cd ',' | wc -c) + 1 )) < $CORE_CHOSEN ]]; then
 	echo -e "Selected number of run COREs more than what the environment provides. Please check total number of enabled COREs on the system." >&2
 	exit 1
 else
-	echo "core_run = $CORE_RUN"
 	cset shield -c "$CORE_RUN" -k on --force
 fi
 
 
-if [[ -z "$CORE_COLLECT" ]]; then
-	echo -e "The system does not have any COREs left to collect results. This can result in unwanted overhead and skew the power consumption of the monitored run COREs. Continue with execution? (Y/N)" >&1
-	read USER_INPUT
-	while true;
-	do
-		if [[ "$USER_INPUT" == Y || "$USER_INPUT" == y ]]; then
-			echo "Continuing with program." >&1
-			break
-		elif [[ "$USER_INPUT" == N || "$USER_INPUT" == n ]]; then
-			echo "Program exiting." >&1
-			exit 0                            
-		else
-			echo "Invalid input: $USER_INPUT !(Expected Y/N)" >&2
-			exit 1
-		fi
-	done
-fi
-
-echo "core_hotplug = $CORE_HOTPLUG"
 #Turning off unwanted cores to enable directed cluster sensor readings
 for i in ${CORE_HOTPLUG//,/ }
 do
@@ -346,7 +349,6 @@ echo 0 > "/sys/devices/odroid_fan.15/fan_mode"
 #Put fan on MAX RPM
 echo 255 > "/sys/devices/odroid_fan.15/pwm_duty"
 
-
 #Run benchmarks for specified number of runs
 for i in $(seq 1 "$NUM_RUNS");
 do   
@@ -359,8 +361,8 @@ do
 			echo "Core frequency (big): $FREQ_SELECT""Mhz"
 			for FREQ2_SELECT in $CORE2_FREQ
 			do
-				cpufreq-set -d "$FREQ_SELECT" -u "$FREQ_SELECT" -c 0
-				echo "Core frequency (LITTLE): $FREQ_SELECT""Mhz"
+				cpufreq-set -d "$FREQ2_SELECT" -u "$FREQ2_SELECT" -c 0
+				echo "Core frequency (LITTLE): $FREQ2_SELECT""Mhz"
 				#Run collections scripts in parallel to the benchmarks.
 				#I can input the number of enabled LITTLE and big cores for sensor script, but for now I don't care about individual temperature so I'm just using 1 1 to save space on the output files. freq/volt/curr/power are all agreated per-cluster so 1 1 enables me to get that inforamtion from the sensors for both clusters. 
 				#The only benefit of adding the involved cores would be to give me per-core temperature information, but those are normalized by the big fan anyway.
@@ -378,8 +380,9 @@ do
 					#If there is a specified events list then start events collection
 					 ./get_cpu_events.sh -c "$CORE_RUN" -s "benchmarks.data" -x "$BENCH_EXEC" -e "$EVENTS_LIST_FILE" -t "$SAMPLE_MS" 2> "events_raw.data" 
 				else
-					#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times
-					$BENCH_EXEC $CORE_CHOSEN > "benchmarks.data"
+					#Else initiate collection without PMU events just power data (this is useful for overhead computation). Note that the $BENCH_EXEC is a wrapper that gets the nubmer of cores chosen to run. This is to enable PARSEC multithreading or to run cBench multiple concurrent times. We can also specify the core list as safe check to use taskset in the bench exec.
+	taskset -c -p $3 $PROC_parsec	
+					$BENCH_EXEC "$CORE_CHOSEN" "$CORE_RUN"  > "benchmarks.data"
 				fi
 			
 				#after benchmarks have run kill sensor collect and smartpower (if chosen)
@@ -466,6 +469,7 @@ do
 		fi
 	done
 done
+
 echo "Returning environment to previous state"
 for i in ${CORE_HOTPLUG//,/ }
 do

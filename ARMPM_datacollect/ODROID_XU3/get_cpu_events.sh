@@ -153,6 +153,6 @@ do
 done
 
 [[ -z $BENCH_SAVE ]] && BENCH_SAVE=/dev/stdout
-./perf stat -g --cpu "$CORE_RUN" -e "$EVENTS_LIST" -I "$SAMPLE_TIME" -x "\t" "$BENCH_EXEC" $CORE_CHOSEN > $BENCH_SAVE #2> /dev/null
+./perf stat -g --cpu "$CORE_RUN" -e "$EVENTS_LIST" -I "$SAMPLE_TIME" -x "\t" "$BENCH_EXEC" "$CORE_CHOSEN" "$CORE_RUN" > $BENCH_SAVE #2> /dev/null
 #execute perf that follows the thread this is to provide me with a base scenario
 #./perf stat -g -e $EVENTS_LIST -I $SAMPLE_TIME -x "\t" $BENCH_EXEC > $BENCH_SAVE #2> /dev/null
