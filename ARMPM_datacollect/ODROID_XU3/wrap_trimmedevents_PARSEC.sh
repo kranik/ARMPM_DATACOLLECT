@@ -52,7 +52,7 @@
 
 #Events list 9 (only big)
 
-./MC_XU3.sh -b 1 -f 1800000,1700000,1600000,1500000,1400000,1300000,1200000,1100000,1000000,900000,800000,700000,600000,500000,400000,300000,200000 -n 2 -x /home/Work/DATACOLLECT/ARMPM_datacollect/Workloads/	parsec-3.0/parsec_benchlist_timestamp_cset.sh -e /home/Work/DATACOLLECT/ARMPM_datacollect/ODROID_XU3/events_lists_trimmed/big/events_list_big_9.data -t 500000000 -s /home/Work/DATACOLLECT/Results/XU3_1/cset_perfcpu_PARSEC_green_eMMC_trimmedevents_c1/big/events_list_9/
+./MC_XU3.sh -b 1 -f 1800000,1700000,1600000,1500000,1400000,1300000,1200000,1100000,1000000,900000,800000,700000,600000,500000,400000,300000,200000 -n 2 -x /home/Work/DATACOLLECT/ARMPM_datacollect/Workloads/parsec-3.0/parsec_benchlist_timestamp_cset.sh -e /home/Work/DATACOLLECT/ARMPM_datacollect/ODROID_XU3/events_lists_trimmed/big/events_list_big_9.data -t 500000000 -s /home/Work/DATACOLLECT/Results/XU3_1/cset_perfcpu_PARSEC_green_eMMC_trimmedevents_c1/big/events_list_9/
 
 #Overhead
 
@@ -118,7 +118,7 @@
 
 #Events list 9 (only big)
 
-./MC_XU3.sh -b 2 -f 1800000,1700000,1600000,1500000,1400000,1300000,1200000,1100000,1000000,900000,800000,700000,600000,500000,400000,300000,200000 -n 2 -x /home/Work/DATACOLLECT/ARMPM_datacollect/Workloads/	parsec-3.0/parsec_benchlist_timestamp_cset.sh -e /home/Work/DATACOLLECT/ARMPM_datacollect/ODROID_XU3/events_lists_trimmed/big/events_list_big_9.data -t 500000000 -s /home/Work/DATACOLLECT/Results/XU3_1/cset_perfcpu_PARSEC_green_eMMC_trimmedevents_c2/big/events_list_9/
+./MC_XU3.sh -b 2 -f 1800000,1700000,1600000,1500000,1400000,1300000,1200000,1100000,1000000,900000,800000,700000,600000,500000,400000,300000,200000 -n 2 -x /home/Work/DATACOLLECT/ARMPM_datacollect/Workloads/parsec-3.0/parsec_benchlist_timestamp_cset.sh -e /home/Work/DATACOLLECT/ARMPM_datacollect/ODROID_XU3/events_lists_trimmed/big/events_list_big_9.data -t 500000000 -s /home/Work/DATACOLLECT/Results/XU3_1/cset_perfcpu_PARSEC_green_eMMC_trimmedevents_c2/big/events_list_9/
 
 #Overhead
 
@@ -184,7 +184,7 @@
 
 #Events list 9 (only big)
 
-./MC_XU3.sh -b 3 -f 1800000,1700000,1600000,1500000,1400000,1300000,1200000,1100000,1000000,900000,800000,700000,600000,500000,400000,300000,200000 -n 2 -x /home/Work/DATACOLLECT/ARMPM_datacollect/Workloads/	parsec-3.0/parsec_benchlist_timestamp_cset.sh -e /home/Work/DATACOLLECT/ARMPM_datacollect/ODROID_XU3/events_lists_trimmed/big/events_list_big_9.data -t 500000000 -s /home/Work/DATACOLLECT/Results/XU3_1/cset_perfcpu_PARSEC_green_eMMC_trimmedevents_c3/big/events_list_9/
+./MC_XU3.sh -b 3 -f 1800000,1700000,1600000,1500000,1400000,1300000,1200000,1100000,1000000,900000,800000,700000,600000,500000,400000,300000,200000 -n 2 -x /home/Work/DATACOLLECT/ARMPM_datacollect/Workloads/parsec-3.0/parsec_benchlist_timestamp_cset.sh -e /home/Work/DATACOLLECT/ARMPM_datacollect/ODROID_XU3/events_lists_trimmed/big/events_list_big_9.data -t 500000000 -s /home/Work/DATACOLLECT/Results/XU3_1/cset_perfcpu_PARSEC_green_eMMC_trimmedevents_c3/big/events_list_9/
 
 #Overhead
 
@@ -250,7 +250,7 @@
 
 #Events list 9 (only big)
 
-./MC_XU3.sh -b 4 -f 1800000,1700000,1600000,1500000,1400000,1300000,1200000,1100000,1000000,900000,800000,700000,600000,500000,400000,300000,200000 -n 2 -x /home/Work/DATACOLLECT/ARMPM_datacollect/Workloads/	parsec-3.0/parsec_benchlist_timestamp_cset.sh -e /home/Work/DATACOLLECT/ARMPM_datacollect/ODROID_XU3/events_lists_trimmed/big/events_list_big_9.data -t 500000000 -s /home/Work/DATACOLLECT/Results/XU3_1/cset_perfcpu_PARSEC_green_eMMC_trimmedevents_c4/big/events_list_9/
+./MC_XU3.sh -b 4 -f 1800000,1700000,1600000,1500000,1400000,1300000,1200000,1100000,1000000,900000,800000,700000,600000,500000,400000,300000,200000 -n 2 -x /home/Work/DATACOLLECT/ARMPM_datacollect/Workloads/parsec-3.0/parsec_benchlist_timestamp_cset.sh -e /home/Work/DATACOLLECT/ARMPM_datacollect/ODROID_XU3/events_lists_trimmed/big/events_list_big_9.data -t 500000000 -s /home/Work/DATACOLLECT/Results/XU3_1/cset_perfcpu_PARSEC_green_eMMC_trimmedevents_c4/big/events_list_9/
 
 #Overhead
 
