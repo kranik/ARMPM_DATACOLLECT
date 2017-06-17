@@ -370,22 +370,22 @@ do
 
 				#Organize results -> copy them in the save dir that is specified or put them in the PWD
 				if [[ -n $SAVE_DIR ]]; then
-					mkdir -v -p "$SAVE_DIR/Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
-					echo "Copying results to chosen dir: $SAVE_DIR/Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
-					cp -v "sensors.data" "benchmarks.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+					mkdir -v -p "$SAVE_DIR/Run_$i/$FREQ2_SELECT""_$FREQ_SELECT"
+					echo "Copying results to chosen dir: $SAVE_DIR/Run_$i/$FREQ2_SELECT""_$FREQ_SELECT"
+					cp -v "sensors.data" "benchmarks.data" "$SAVE_DIR/Run_$i/$FREQ2_SELECT""_$FREQ_SELECT"
 					rm -v "sensors.data" "benchmarks.data"
 					#if we have event collection enabled, then copy those too
 					if [[ -n $EVENTS_LIST_FILE ]]; then
-						cp -v "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+						cp -v "events_raw.data" "$SAVE_DIR/Run_$i/$FREQ2_SELECT""_$FREQ_SELECT"
 						rm -v "events_raw.data"
 					fi
 				else
-					mkdir -v -p "Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
-					echo "Copying results to dir: Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
-					cp -v "sensors.data" "benchmarks.data" "Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+					mkdir -v -p "Run_$i/$FREQ2_SELECT""_$FREQ_SELECT"
+					echo "Copying results to dir: Run_$i/$FREQ2_SELECT""_$FREQ_SELECT"
+					cp -v "sensors.data" "benchmarks.data" "Run_$i/$FREQ2_SELECT""_$FREQ_SELECT"
 					rm -v "sensors.data" "benchmarks.data"
 					if [[ -n $EVENTS_LIST_FILE ]]; then
-						cp -v "events_raw.data" "Run_$i/$FREQ_SELECT""_$FREQ2_SELECT"
+						cp -v "events_raw.data" "Run_$i/$FREQ2_SELECT""_$FREQ_SELECT"
 						rm -v "events_raw.data"
 					fi
 				fi
