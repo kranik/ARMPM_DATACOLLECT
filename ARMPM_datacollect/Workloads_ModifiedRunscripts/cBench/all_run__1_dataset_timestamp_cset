@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#RUNTIME Environment
+#export CCC_RE=lli
+#export CCC_RE=cil32-ilrun
+
+#Input arguments is header flag enable (whether to include header or not)
+
+echo -e "#Name\tStart(ns)\tEnd(ns)"
+
+DIR="$( cd "$( dirname "$BASH_SOURCE[0]}" )" && pwd )"
+
+if [ -f /$DIR/bench_list ]
+then
+	benchmarks=`grep -v ^# /$DIR/bench_list`
+else
+	benchmarks=*  
+fi
+
+for i in $benchmarks
+do
+        if [ -d "/$DIR/$i/src_work" ] 
+        then
+            	# *** process directory ***
+            	cd /$DIR/$i/src_work
+	        for j in `seq 1 1`;
+        	do
+	                t1=$(date +'%s%N')
+                  #Experimental - multiple instance run using $1 as input
+                  #Run in background and leave one sequential to signify end of operation
+                  #using cset and scheduler should schedule those to unoccupied cores in shield, but it is a bit random
+                  #can make this more complicated by passing more arguments and scheduling to specific cores in shield but will only do if needed
+                  for k in $(seq 1 $(($1-1)));
+                  do
+                    cset shield -e bash ./__run $j > /dev/null 2> /dev/null &
+                  done
+       		        cset shield -e bash ./__run $j > /dev/null 2> /dev/null
+               		t2=$(date +'%s%N')
+	                echo -e "$i\t$t1\t$t2"
+		done  
+            	# *************************
+	fi
+done
+
