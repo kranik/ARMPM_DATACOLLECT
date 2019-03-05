@@ -38,6 +38,6 @@ Thumbs.db
 
 # Project-specific files and folders #
 ######################################
-ARMPM_datacollect/Workloads/*
+Scripts/Workloads/*
 Results/*
 
