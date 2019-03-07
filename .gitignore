@@ -38,6 +38,5 @@ Thumbs.db
 
 # Project-specific files and folders #
 ######################################
-Scripts/Workloads/*
+Workloads/*
 Results/*
-

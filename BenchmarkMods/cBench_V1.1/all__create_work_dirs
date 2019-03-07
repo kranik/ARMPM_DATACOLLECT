@@ -1,0 +1,22 @@
+#! /bin/sh
+
+for i in *
+do
+
+if [ -d "$i" ] 
+then
+ tmp=$PWD
+ cd $i
+ if [ -d "src" ] 
+ then
+  # *** process directory ***
+  echo $i
+  cp -rf src src_work
+  chmod +x src_work/_*
+  # *************************
+ fi
+ cd $tmp
+fi
+
+done
+
