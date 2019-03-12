@@ -28,7 +28,7 @@ On the host machine you can either use [_PuTTY_](https://www.putty.org/) or [_mi
 Also make sure to enable internet access on the board so you can download the kernel, methodology nad workloads.
 
 Username ans pwd are as follows:
-````
+```
 odroid login: root
 password: odroid
 ```
@@ -177,7 +177,7 @@ The last thing left to do is to copy the compiled `perf` and `sensors` programs 
 
 ## Installing the workloads for the models
 
-Now that the key components of the methodology are loaded and compiled on to the board the last thing left to do is to download and compile the workloads to be used in the models. You can essentually use any workloads you like as long as you can provide some control script that help [`MC_XU3.sh`](Scripts/ODROID_XU3/MC_XU3.sh)set the environment and call the benchmarks. 
+Now that the key components of the methodology are loaded and compiled on to the board the last thing left to do is to download and compile the workloads to be used in the models. You can essentually use any workloads you like as long as you can provide some control script that help [`MC_XU3.sh`](Scripts/ODROID_XU3/MC_XU3.sh) set the environment and call the benchmarks. The supporting scripts are given [_here_](BenchmarkMods/cBench_V1.1/) for `cBench and [_here_](BenchmarkMods/parsec-3.0/) for `parsec`. 
 
 ### cBench_V1.1
 Did not upload this to repo, jsut uploaded modified compilation scripts to ARMPM_DATACOLLECT/BenchmarkMods/
