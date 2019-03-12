@@ -1,0 +1,52 @@
+diff --git a/arch/arm/boot/dts/exynos5422_evt0.dtsi b/arch/arm/boot/dts/exynos5422_evt0.dtsi
+index dd2fc22..1ef18cf 100644
+--- a/arch/arm/boot/dts/exynos5422_evt0.dtsi
++++ b/arch/arm/boot/dts/exynos5422_evt0.dtsi
+@@ -92,6 +92,24 @@
+                };
+        };
+ 
++        arm-pmu {
++
++                compatible = "arm,cortex-a15-pmu",  "arm,cortex-a7-pmu";
++
++                interrupts = <0 79 4>,
++
++                             <0 80 4>,
++
++                             <0 81 4>,
++
++                             <0 92 4>,
++
++                             <0 93 4>,
++
++                             <0 97 4>;
++
++        };
++
+        watchdog@10020000 {
+                compatible = "samsung,s3c2410-wdt";
+                reg = <0x101D0000 0x100>;
+diff --git a/arch/arm/configs/odroidxu3_defconfig b/arch/arm/configs/odroidxu3_defconfig
+index 8558448..d4ff716 100644
+--- a/arch/arm/configs/odroidxu3_defconfig
++++ b/arch/arm/configs/odroidxu3_defconfig
+@@ -159,14 +159,14 @@ CONFIG_PERF_USE_VMALLOC=y
+ #
+ # Kernel Performance Events And Counters
+ #
+-# CONFIG_PERF_EVENTS is not set
++CONFIG_PERF_EVENTS=y
+ CONFIG_VM_EVENT_COUNTERS=y
+ # CONFIG_SLUB_DEBUG is not set
+ CONFIG_COMPAT_BRK=y
+ # CONFIG_SLAB is not set
+ CONFIG_SLUB=y
+ # CONFIG_SLOB is not set
+-# CONFIG_PROFILING is not set
++CONFIG_PROFILING=y
+ CONFIG_TRACEPOINTS=y
+ CONFIG_HAVE_OPROFILE=y
+ # CONFIG_KPROBES is not set
+
+
