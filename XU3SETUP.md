@@ -180,22 +180,19 @@ The last thing left to do is to copy the compiled `perf` and `sensors` programs 
 Now that the key components of the methodology are loaded and compiled on to the board the last thing left to do is to download and compile the workloads to be used in the models. You can essentually use any workloads you like as long as you can provide some control script that help [`MC_XU3.sh`](Scripts/ODROID_XU3/MC_XU3.sh) set the environment and call the benchmarks. The supporting scripts are given [_here_](BenchmarkMods/cBench_V1.1/) for `cBench and [_here_](BenchmarkMods/parsec-3.0/) for `parsec`. 
 
 ### cBench_V1.1
-Did not upload this to repo, jsut uploaded modified compilation scripts to ARMPM_DATACOLLECT/BenchmarkMods/
-make a directory somewhere I call my Workloads in this example
-http://ctuning.org/wiki/index.php/CTools:CBench:Downloads
 
-so copy the modified scripts to the cBench dir
-$ cp ARMPM_DATACOLLECT/BenchmarkMods/cBench/* ARMPM_DATACOLLECT/Workloads/cBench_V1.1/
-$ chmod +x all_*
+First download [cBench](http://ctuning.org/wiki/index.php/CTools:CBench:DownloadsO its its own directory and copy over all the script and files in [`BenchmarkMods/cBench_V1.1/`](BenchmarkMods/cBench_V1.1/) to the newly downloaded benchmark directory. In order to set-up the benchmark suite you need to enable all script files for execution using `$ chmod +x all_*` and then compile the benchmarks using the following commands/scripts:
+```
 $ ./all__list_compiled.sh
 $ ./all__create_work_dirs
 $ ./all__fix_libmath.sh
 $ ./all_compile
+```
 
-test
-$ ./all__list_compiled.sh
+You can test if the benchmarks have compiled correctly by doing `$ ./all__list_compiled.sh`. 
 
-edit bench_list as you see fot
+The support files also contain one file called [`bench_list`](BenchmarkMods/cBench_V1.1/bench_list) which you can edit to specify which benchmarks to compile/use. You can edit it as you see fit by commenting out the unwanted benchmarks from the list like so:
+
 ```
 automotive_bitcount
 automotive_qsort1
@@ -230,10 +227,8 @@ telecom_adpcm_d
 telecom_CRC32
 telecom_gsm
 ```
+You can test the benchmarks suite by doing `$ ./all_run__1_dataset`. A sample output would be:
 
-Test
-
-$ ./all_run__1_dataset
 ```
 **********************************************************
 automotive_bitcount
@@ -287,42 +282,43 @@ user    0m9.535s
 sys     0m0.295s
 ```
 
+Please note that I have provided a wrapper script [`all_run__1_dataset_timestamp_cset`](BenchmarkMods/cBench_V1.1/all_run__1_dataset_timestamp_cset), which is used by [`MC_XU3.sh`](Scripts/ODROID_XU3/MC_XU3.sh) abd it in turn calls the benchmarks. The important part of that script is setting up data collection timestamps for later syncronization and isolating the workload on a required processing cluster/core via `cset`.
+
+If you want to use other benchmark suites please provide a proper wrap file which does include the `cset` shielding and timestaps.
+
 ### parsec-3.0
 
-https://parsec.cs.princeton.edu/
+Setting up [_parsec_](https://parsec.cs.princeton.edu/) is straightforward, but more time consuming and not all benchmarks might compile natively on the platform. First you need to download the [core]( http://parsec.cs.princeton.edu/download/3.0/parsec-3.0-core.tar.gz) and [native inputs](http://parsec.cs.princeton.edu/download/3.0/parsec-3.0-input-native.tar.gz) and extrac them in the same directory. You should end up with one _parsec-3.0_ folder with all files in it. Please allow at least 5GB free space on the memory card before you do this.
 
-Download core: http://parsec.cs.princeton.edu/download/3.0/parsec-3.0-core.tar.gz
-Download inputs: http://parsec.cs.princeton.edu/download/3.0/parsec-3.0-input-native.tar.gz
+Afterwards, simularly to the _cBench_ setup you need to copy the modified scripts in [BenchmarkMods/parsec-3.0/](BenchmarkMods/parsec-3.0/) to the parsec directory. Before you do anything else, please look at the parsec _README_ file, wich contains insrutions on how to compile and run the benchmarks. 
 
-Extract the core and then extract the native inputs. The inputs will extract to parsec-3.0 folder so if you extract both in the same locaion you should end up with one parsec-3.0 folder with all files in it.
-
-Its big though so get ready, its like 4 gigs
-
-so copy the modified scripts to the cBench dir
-$ cp ARMPM_DATACOLLECT/BenchmarkMods/parsec-3.0/* ARMPM_DATACOLLECT/Workloads/parsec-3.0/
-
-
-please look at the parsec readme
+You can do the following commands to set the environment and compile the benchmarks, again not all benchmarks compile and I have provided a list which worked for me.
+```
 $ source env.sh     
 $ chmod +x bin/parsecmgmt
 $ parsecmgmt -a build -p parsec.facesim parsec.freqmine parsec.streamcluster splash2x.barnes splash2x.fmm splash2x.radiosity splash2x.raytrace splash2x.water_nsquared parsec.blackscholes parsec.bodytrack
+```
 
-not everything compiles, the benchmarks I used in my experiments are given in bench_list.data
-if you get the following build error
+The benchmarks I used in my experiments are also given in [`bench_list.data`](BenchmarkMods/parsec-3.0/bench_list.data).
+
+If during the process you get the following build error:
 
 ```
+...
 [PARSEC] [========== Building package parsec.bodytrack [1] ==========]
 [PARSEC] [---------- Analyzing package parsec.bodytrack ----------]
 [PARSEC] parsec.bodytrack does not depend on any other packages.
 [PARSEC] [---------- Building package parsec.bodytrack ----------]
 [PARSEC] Error: Need 'configure' script or a '[Mm]akefile' to build package parsec.bodytrack.
+...
 ```
-you need to go to (in this example) parsec-3.0/pkgs/apps/bodytrack/src and do `$ chmod +x configure` so that the cofigure script is executable
 
-test built parsec benchmarks
+You need to go to the benchmark source directory, in this example - `/parsec-3.0/pkgs/apps/bodytrack/src` and do `$ chmod +x configure` so that the cofigure script is executable. Then, assuming all prerequisites are met, the benchmark should compule natively.
 
-$ parsecmgmt -a run -p parsec.facesim parsec.freqmine parsec.streamcluster splash2x.barnes splash2x.fmm splash2x.radiosity splash2x.raytrace splash2x.water_nsquared parsec.blackscholes parsec.bodytrack
-if you get:
+After compilation you can test if the benchmarks execute correctly by running:
+` $ parsecmgmt -a run -p parsec.facesim parsec.freqmine parsec.streamcluster splash2x.barnes splash2x.fmm splash2x.radiosity splash2x.raytrace splash2x.water_nsquared parsec.blackscholes parsec.bodytrack`
+
+If you get the following error:
 ```
 ...
 [PARSEC] [========== Running benchmark splash2x.barnes [2] ==========]
@@ -330,6 +326,17 @@ if you get:
 ...
 ```
 
-Again you need to chmod +x the *.sh script file
+Again you need to `chmod +x` the `*.sh` script file to enable execution. Again for further instruction on how to use `$ parsecmgmt` and control the benchmark suite execution, please refer to the _README_ file. I have also provided a dedicated control script [`parsec_benchlist_timestamp_cset.sh`](BenchmarkMods/parsec-3.0/parsec_benchlist_timestamp_cset.sh), which handles `cset` calls and timestamping.
 
-and if it all runs DONE! Please consult the readme file of parsec-3.0 fpr more details.
+### Adding your own benchmarks
+
+If you want to add your own benchmarks, the most important thing is to add a wrapper script that the [`MC_XU3.sh`](Scripts/ODROID_XU3/MC_XU3.sh). The key parts of that are to use timestamps before and after execution for later syncronization and to use `cset` to shield the execution on the required core, in order to minimize data collection and OS overhead. Please refer to this example:
+```
+t1=$(date +'%s%N')
+cset shield -e bash ./benchmark_executable
+t2=$(date +'%s%N')
+echo -e "$benchmark_name\t$t1\t$t2"
+```
+Where `./benchmark_executable` is the actual benchmark program and `$benchmark_name` is the benchmark identifier.
+
+Please let me know if you have any difficulties following this guide via [email](mailto:kris.nikov@bris.ac.uk).
