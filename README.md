@@ -1,6 +1,6 @@
 # Data collection for use in power model generation for ARM big.LITTLE aka ARMPM\_DATACOLLECT
 
-**August 2017 - Since adding parsec-3.0 to the workload selection and updating the main control script for multithread execution, this part of the project is finished.
+**August 2017 - Since adding parsec-3.0 to the workload selection and updating the main control script for multithread execution, this part of the project is finished.**
 
 **February 2019 - I have reopened the [ARMPM\_BUILDMODEL](https://github.com/kranik/ARMPM_BUILDMODEL) project once again, however [ARMPM\_DATACOLLECT](https://github.com/kranik/ARMPM\_DATACOLLECT) is still considered complete since I am not planning on altering the data collection.** 
 
