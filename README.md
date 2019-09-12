@@ -6,6 +6,12 @@
 
 Full details about the methodology and the produced models are presented in the dissertation [**Power Modelling and Analysis on Heterogeneous Embedded Systems**](https://seis.bristol.ac.uk/~eejlny/downloads/kris_thesis.pdf).
 
+## Publications:
+
+Nikov, Krastin, Jose L. Nunez-Yanez, and Matthew Horsnell. "Evaluation of hybrid run-time power models for the ARM big. LITTLE architecture." 2015 IEEE 13th International Conference on Embedded and Ubiquitous Computing. [**PDF**](https://ieeexplore.ieee.org/abstract/document/7363640)
+
+Nikov, Krastin and Jose L. Nunez-Yanez. "Intra- and inter-core power modelling for single-ISA heterogeneous processors." International Journal of Embedded Systems. DOI: 10.1504/IJES.2020.10021023 (accepted and awaiting publication). [**PDF**](https://seis.bristol.ac.uk/~eejlny/downloads/nikov_power.pdf)
+
 ## Getting Started
 
 This software repo contains the data collection scripts that run the workoads and collect the on-board power sensor and PMU ardware event samples that are later used in [ARMPM\_BUILDMODEL](https://github.com/kranik/ARMPM_BUILDMODEL) to generate accurate power models. The final methodology is built and tested on the HARDKERNEL [ODROID-XU3](https://wiki.odroid.com/old_product/odroid-xu3/odroid-xu3) development board. The methodology is portable and can be ported to other platform if needed as long as the specific power and PMU event collection mechanism are updated for new platforms.
